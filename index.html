@@ -219,26 +219,62 @@ body {
 
 /* Action */
 .action-area { padding: 0 16px; margin-bottom: 16px; }
-.call-btn {
-  width: 100%; padding: 16px;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
-  color: var(--red-deep); border: none; border-radius: 16px;
-  font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.2rem;
-  cursor: pointer; transition: all 0.2s;
-  box-shadow: 0 4px 25px rgba(240,192,64,0.3); letter-spacing: 2px;
-  position: relative; overflow: hidden;
+.turn-info {
+  text-align: center; font-size: 0.85rem; color: var(--gold);
+  margin-bottom: 10px; font-weight: 700;
+  padding: 10px; background: rgba(240,192,64,0.1); border-radius: 12px;
 }
-.call-btn::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transform: translateX(-100%); animation: shimmer 2.5s ease-in-out infinite;
+.turn-info.my-turn {
+  background: rgba(76,175,80,0.15);
+  border: 2px solid #4CAF50;
+  animation: pulseTurn 1.5s ease-in-out infinite;
 }
-@keyframes shimmer { 50%,100% { transform: translateX(100%); } }
-.call-btn:hover { transform: translateY(-2px); }
-.call-btn:active { transform: scale(0.97); }
-.call-btn:disabled { background: var(--glass); color: rgba(255,255,255,0.3); box-shadow: none; cursor: default; }
-.call-btn:disabled::after { display: none; }
-.turn-info { text-align: center; font-size: 0.75rem; color: var(--gold-dim); margin-top: 7px; opacity: 0.7; }
+@keyframes pulseTurn { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+
+/* Item Selection Grid */
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 16px;
+}
+.item-grid::-webkit-scrollbar { width: 6px; }
+.item-grid::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.4); border-radius: 6px; }
+
+.item-choice {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,248,232,0.9);
+  border: 2px solid rgba(196,30,30,0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 6px;
+}
+.item-choice:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold);
+  box-shadow: 0 4px 12px rgba(240,192,64,0.3);
+}
+.item-choice:active { transform: scale(0.95); }
+.item-choice.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.7);
+}
+.item-choice.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+.item-choice .emoji { font-size: 1.8rem; line-height: 1; }
+.item-choice .lbl { font-size: 0.5rem; color: var(--red-dark); margin-top: 4px; font-weight: 700; text-align: center; line-height: 1; }
 
 /* Card */
 .card-section { padding: 0 16px; }
@@ -259,7 +295,7 @@ body {
 .corner.tl { top:7px; left:9px; } .corner.tr { top:7px; right:9px; }
 .corner.bl { bottom:7px; left:9px; } .corner.br { bottom:7px; right:9px; }
 
-.grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 7px; }
+.grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; }
 
 .cell {
   aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -267,7 +303,7 @@ body {
   cursor: pointer; transition: all 0.15s; user-select: none; position: relative;
 }
 .cell:active { transform: scale(0.9); }
-.cell .emoji { font-size: 1.5rem; line-height: 1.2; transition: transform 0.15s; }
+.cell .emoji { font-size: 1.3rem; line-height: 1.2; transition: transform 0.15s; }
 .cell .lbl { font-size: 0.48rem; color: var(--red-dark); opacity: 0.6; margin-top: 1px; font-weight: 700; text-align: center; line-height: 1.1; }
 
 .cell.marked {
@@ -451,8 +487,8 @@ body {
 
   <!-- Action -->
   <div class="action-area">
-    <button class="call-btn" id="callBtn" onclick="callNext()">🎊 開獎！</button>
     <div class="turn-info" id="turnInfo"></div>
+    <div class="item-grid" id="itemGrid"></div>
   </div>
 
   <!-- Bingo Card -->
@@ -503,6 +539,9 @@ let currentRoomRef = null;
 let currentRoomCode = null;
 let isHost = false;
 let gameMode = 'local'; // 'local' or 'online'
+let myPlayerName = ''; // Current player's name
+let currentTurn = ''; // Whose turn it is
+let turnOrder = []; // Array of player names in turn order
 
 // Initialize Firebase if config is valid
 try {
@@ -560,8 +599,10 @@ function seededShuffle(arr, seed) {
 
 function makeCard(name) {
   const shuffled = seededShuffle(ALL_ITEMS, name + ':cny2026:bingo');
-  const picked = shuffled.slice(0, 24).map(it => ({e:it.e, l:it.l, marked:false, winLine:false}));
-  picked.splice(12, 0, {e:FREE.e, l:FREE.l, free:true, marked:true, winLine:false});
+  // For 6x6 grid: use all 35 items + 1 free space = 36 cells
+  const picked = shuffled.map(it => ({e:it.e, l:it.l, marked:false, winLine:false}));
+  // Insert FREE space at position 17 (middle-ish of 6x6 grid)
+  picked.splice(17, 0, {e:FREE.e, l:FREE.l, free:true, marked:true, winLine:false});
   return picked;
 }
 
@@ -620,12 +661,16 @@ async function createRoom() {
   currentRoomCode = generateRoomCode();
   currentRoomRef = db.ref('rooms/' + currentRoomCode);
   isHost = true;
+  myPlayerName = hostName;
 
   // Create room data
   await currentRoomRef.set({
     host: hostName,
     players: { [hostName]: { name: hostName, joinedAt: Date.now() } },
     calledItems: [],
+    turnOrder: [hostName],
+    currentTurn: hostName,
+    resetCounter: 0,
     createdAt: Date.now(),
     gameStarted: false
   });
@@ -636,6 +681,9 @@ async function createRoom() {
     card: makeCard(hostName),
     lines: 0
   }];
+
+  currentTurn = hostName;
+  turnOrder = [hostName];
 
   // Show room code
   document.getElementById('displayRoomCode').textContent = currentRoomCode;
@@ -665,6 +713,7 @@ async function joinRoom() {
   currentRoomCode = roomCode;
   currentRoomRef = db.ref('rooms/' + currentRoomCode);
   isHost = false;
+  myPlayerName = playerName;
 
   // Check if room exists
   const snapshot = await currentRoomRef.once('value');
@@ -687,6 +736,10 @@ async function joinRoom() {
     joinedAt: Date.now()
   });
 
+  // Update turn order
+  const newTurnOrder = [...(roomData.turnOrder || []), playerName];
+  await currentRoomRef.child('turnOrder').set(newTurnOrder);
+
   // Setup local player
   players = [{
     name: playerName,
@@ -705,6 +758,38 @@ async function joinRoom() {
 
 function listenToRoom() {
   if (!currentRoomRef) return;
+
+  // Listen for resetCounter
+  currentRoomRef.child('resetCounter').on('value', (snapshot) => {
+    const counter = snapshot.val() || 0;
+    if (counter > 0) {
+      // Reset all player cards
+      players.forEach(p => {
+        p.card = makeCard(p.name);
+        p.lines = 0;
+      });
+      winShownFor = new Set();
+      if (document.getElementById('gameScreen').classList.contains('active')) {
+        render();
+      }
+    }
+  });
+
+  // Listen for currentTurn
+  currentRoomRef.child('currentTurn').on('value', (snapshot) => {
+    currentTurn = snapshot.val() || '';
+    if (document.getElementById('gameScreen').classList.contains('active')) {
+      render();
+    }
+  });
+
+  // Listen for turnOrder
+  currentRoomRef.child('turnOrder').on('value', (snapshot) => {
+    turnOrder = snapshot.val() || [];
+    if (document.getElementById('gameScreen').classList.contains('active')) {
+      render();
+    }
+  });
 
   // Listen for players
   currentRoomRef.child('players').on('value', (snapshot) => {
@@ -752,7 +837,7 @@ function listenToRoom() {
       render();
 
       // Check for new bingos
-      const myPlayerIndex = players.findIndex(p => p.name === (isHost ? players[0].name : players[currentView].name));
+      const myPlayerIndex = players.findIndex(p => p.name === myPlayerName);
       if (myPlayerIndex >= 0 && players[myPlayerIndex].lines > 0 && !winShownFor.has(myPlayerIndex)) {
         winShownFor.add(myPlayerIndex);
         showWin(players[myPlayerIndex].name);
@@ -841,7 +926,13 @@ async function resetGame() {
       return;
     }
     // Reset Firebase
-    await currentRoomRef.child('calledItems').set([]);
+    const snapshot = await currentRoomRef.child('resetCounter').once('value');
+    const newCounter = (snapshot.val() || 0) + 1;
+    await currentRoomRef.update({
+      calledItems: [],
+      resetCounter: newCounter,
+      currentTurn: turnOrder[0] || ''
+    });
   }
 
   players.forEach(p => {
@@ -855,28 +946,43 @@ async function resetGame() {
 // =========================================================
 // CALL NEXT
 // =========================================================
-async function callNext() {
+// Select a specific item (for turn-based gameplay)
+async function selectItem(item) {
   if (calledItems.length >= ALL_ITEMS.length) {
     showToast('所有項目都開完了！');
     return;
   }
 
-  // Online mode: only host can call
-  if (gameMode === 'online' && !isHost) {
-    showToast('只有主持人可以開獎');
+  // Check if it's this player's turn in online mode
+  if (gameMode === 'online') {
+    if (currentTurn !== myPlayerName) {
+      showToast('還沒輪到你！');
+      return;
+    }
+  }
+
+  // Check if already called
+  const calledSet = new Set(calledItems.map(c => c.e + c.l));
+  if (calledSet.has(item.e + item.l)) {
+    showToast('這個圖案已經被選過了！');
     return;
   }
 
-  const calledSet = new Set(calledItems.map(c => c.e + c.l));
-  const uncalled = ALL_ITEMS.filter(it => !calledSet.has(it.e + it.l));
-  const pick = uncalled[Math.floor(Math.random() * uncalled.length)];
-
-  const newItem = { e: pick.e, l: pick.l, round: calledItems.length + 1 };
+  const newItem = { e: item.e, l: item.l, round: calledItems.length + 1 };
 
   // Update Firebase or local
   if (gameMode === 'online' && currentRoomRef) {
     const updatedItems = [...calledItems, newItem];
-    await currentRoomRef.child('calledItems').set(updatedItems);
+
+    // Calculate next turn
+    const currentIndex = turnOrder.indexOf(currentTurn);
+    const nextIndex = (currentIndex + 1) % turnOrder.length;
+    const nextTurn = turnOrder[nextIndex];
+
+    await currentRoomRef.update({
+      calledItems: updatedItems,
+      currentTurn: nextTurn
+    });
     // Firebase listener will update local state
   } else {
     // Local mode
@@ -885,7 +991,7 @@ async function callNext() {
     // Auto-mark on all players
     players.forEach(p => {
       p.card.forEach(cell => {
-        if (!cell.free && cell.e === pick.e && cell.l === pick.l) {
+        if (!cell.free && cell.e === item.e && cell.l === item.l) {
           cell.marked = true;
         }
       });
@@ -903,7 +1009,7 @@ async function callNext() {
 
     // Check for new bingos
     players.forEach((p, i) => {
-      if (p.lines > 0 && !winShownFor.has(i)) {
+      if (p.lines >= 5 && !winShownFor.has(i)) {
         winShownFor.add(i);
         showWin(p.name);
       }
@@ -916,16 +1022,24 @@ async function callNext() {
 // =========================================================
 function getWinLines(card) {
   const lines = [];
-  for (let r = 0; r < 5; r++) {
-    const row = [r*5, r*5+1, r*5+2, r*5+3, r*5+4];
+  // Check rows (6x6 grid)
+  for (let r = 0; r < 6; r++) {
+    const row = [r*6, r*6+1, r*6+2, r*6+3, r*6+4, r*6+5];
     if (row.every(i => card[i].marked)) lines.push(row);
   }
-  for (let c = 0; c < 5; c++) {
-    const col = [c, c+5, c+10, c+15, c+20];
+  // Check columns
+  for (let c = 0; c < 6; c++) {
+    const col = [c, c+6, c+12, c+18, c+24, c+30];
     if (col.every(i => card[i].marked)) lines.push(col);
   }
-  if ([0,6,12,18,24].every(i => card[i].marked)) lines.push([0,6,12,18,24]);
-  if ([4,8,12,16,20].every(i => card[i].marked)) lines.push([4,8,12,16,20]);
+  // Check diagonal (top-left to bottom-right)
+  if ([0, 7, 14, 21, 28, 35].every(i => card[i].marked)) {
+    lines.push([0, 7, 14, 21, 28, 35]);
+  }
+  // Check diagonal (top-right to bottom-left)
+  if ([5, 10, 15, 20, 25, 30].every(i => card[i].marked)) {
+    lines.push([5, 10, 15, 20, 25, 30]);
+  }
   return lines;
 }
 
@@ -935,8 +1049,9 @@ function getWinLines(card) {
 function render() {
   renderPlayerTabs();
   renderCalledList();
-  renderCard();
+  renderItemGrid();
   renderTurnInfo();
+  renderCard();
 }
 
 function renderPlayerTabs() {
@@ -947,7 +1062,7 @@ function renderPlayerTabs() {
     el.innerHTML = players.map((p, i) => {
       const isMe = i === 0; // First player is always "me" in online mode
       const active = isMe ? 'active' : '';
-      const bingo = p.lines > 0 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
+      const bingo = p.lines >= 5 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
       return `<button class="ptab ${active}" ${isMe ? '' : 'disabled style="opacity:0.5;cursor:default;"'}>
         <span class="dot"></span>${p.name}${bingo}
       </button>`;
@@ -956,7 +1071,7 @@ function renderPlayerTabs() {
     // Local mode: show all players with switching
     el.innerHTML = players.map((p, i) => {
       const active = i === currentView ? 'active' : '';
-      const bingo = p.lines > 0 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
+      const bingo = p.lines >= 5 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
       return `<button class="ptab ${active}" onclick="switchView(${i})">
         <span class="dot"></span>${p.name}${bingo}
       </button>`;
@@ -1019,7 +1134,7 @@ function renderCard() {
         p.card.forEach(c => c.winLine = false);
         lines.forEach(line => line.forEach(j => p.card[j].winLine = true));
         render();
-        if (p.lines > 0 && !winShownFor.has(viewIndex)) {
+        if (p.lines >= 5 && !winShownFor.has(viewIndex)) {
           winShownFor.add(viewIndex);
           showWin(p.name);
         }
@@ -1030,24 +1145,43 @@ function renderCard() {
 }
 
 function renderTurnInfo() {
-  const btn = document.getElementById('callBtn');
   const info = document.getElementById('turnInfo');
 
   if (calledItems.length >= ALL_ITEMS.length) {
-    btn.disabled = true;
-    btn.textContent = '🎊 全部開完了！';
-    info.textContent = '';
+    info.textContent = '🎊 全部開完了！';
+    info.className = 'turn-info';
   } else {
-    if (gameMode === 'online' && !isHost) {
-      btn.disabled = true;
-      btn.textContent = '⏳ 等待主持人開獎...';
-      info.textContent = `第 ${calledItems.length + 1} / ${ALL_ITEMS.length} 輪`;
+    if (gameMode === 'online') {
+      const isMyTurn = currentTurn === myPlayerName;
+      info.textContent = isMyTurn
+        ? `🎯 輪到你選牌了！（${calledItems.length + 1}/${ALL_ITEMS.length}）`
+        : `⏳ 等待 ${currentTurn} 選牌...（${calledItems.length + 1}/${ALL_ITEMS.length}）`;
+      info.className = isMyTurn ? 'turn-info my-turn' : 'turn-info';
     } else {
-      btn.disabled = false;
-      btn.textContent = '🎊 開獎！';
-      info.textContent = `第 ${calledItems.length + 1} / ${ALL_ITEMS.length} 輪`;
+      // Local mode - show simple info
+      info.textContent = `🎊 選擇圖案（${calledItems.length + 1}/${ALL_ITEMS.length}）`;
+      info.className = 'turn-info';
     }
   }
+}
+
+function renderItemGrid() {
+  const grid = document.getElementById('itemGrid');
+  if (!grid) return;
+
+  const calledSet = new Set(calledItems.map(c => c.e + c.l));
+  const canSelect = gameMode === 'local' || (gameMode === 'online' && currentTurn === myPlayerName);
+
+  grid.innerHTML = ALL_ITEMS.map(item => {
+    const isCalled = calledSet.has(item.e + item.l);
+    const disabled = isCalled || !canSelect;
+    const cls = disabled ? 'item-choice disabled' : 'item-choice';
+
+    return `<div class="${cls}" onclick="${disabled ? '' : `selectItem({e:'${item.e}',l:'${item.l}'})`}">
+      <span class="emoji">${item.e}</span>
+      <span class="lbl">${item.l}</span>
+    </div>`;
+  }).join('');
 }
 
 // =========================================================
