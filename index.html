@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>🧧 新春賓果大樂透</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap');
 
@@ -108,6 +113,41 @@ body {
 }
 .login-btn:hover { transform: translateY(-2px); }
 .login-btn:active { transform: scale(0.97); }
+.login-btn.secondary {
+  background: rgba(255,255,255,0.6);
+  color: var(--red-dark);
+  font-size: 1rem;
+  padding: 12px;
+  box-shadow: 0 2px 12px rgba(122,0,0,0.15);
+}
+
+.mode-switch {
+  display: flex; gap: 10px; margin: 20px 0 16px;
+}
+.mode-btn {
+  flex: 1; padding: 10px;
+  background: rgba(255,255,255,0.5); color: var(--red-dark);
+  border: 2px solid rgba(196,30,30,0.15); border-radius: 12px;
+  font-family: 'Noto Sans TC', sans-serif; font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.mode-btn.active {
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: var(--gold-bright); border-color: var(--gold);
+}
+.room-code-display {
+  background: rgba(240,192,64,0.15); border: 2px solid var(--gold);
+  border-radius: 12px; padding: 12px; margin: 16px 0;
+  text-align: center;
+}
+.room-code-display .label { font-size: 0.7rem; color: var(--red-dark); opacity: 0.7; margin-bottom: 4px; }
+.room-code-display .code { font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.8rem; color: var(--red); letter-spacing: 4px; }
+.sync-badge {
+  display: inline-block; background: rgba(76,175,80,0.15);
+  border: 1.5px solid #4CAF50; border-radius: 20px;
+  padding: 4px 12px; font-size: 0.7rem; color: #2E7D32; font-weight: 700;
+  margin-left: 6px;
+}
 
 /* =============== GAME =============== */
 #gameScreen { padding: 0 0 30px; }
@@ -308,17 +348,74 @@ body {
     <div class="login-title">新春賓果大樂透</div>
     <div class="login-sub">全家一起來，老少咸宜！</div>
 
-    <div class="input-group">
-      <label>👥 參加的人（用頓號分隔）</label>
-      <input type="text" id="namesInput" placeholder="例：爸爸、媽媽、阿嬤、小明" autocomplete="off">
+    <!-- Mode Switch -->
+    <div class="mode-switch" id="modeSwitch">
+      <button class="mode-btn active" onclick="switchMode('local')">🏠 本地模式</button>
+      <button class="mode-btn" onclick="switchMode('online')">📡 線上模式</button>
     </div>
 
-    <div style="text-align:center; margin: 16px 0 6px;">
-      <button class="login-btn" onclick="startGame()">🧨 開始遊戲！</button>
+    <!-- Local Mode -->
+    <div id="localMode">
+      <div class="input-group">
+        <label>👥 參加的人（用頓號分隔）</label>
+        <input type="text" id="namesInput" placeholder="例：爸爸、媽媽、阿嬤、小明" autocomplete="off">
+      </div>
+
+      <div style="text-align:center; margin: 16px 0 6px;">
+        <button class="login-btn" onclick="startLocalGame()">🧨 開始遊戲！</button>
+      </div>
+
+      <div style="font-size:0.72rem; color: var(--red-dark); opacity:0.5; text-align:center; margin-top:12px;">
+        共享螢幕模式：大家圍著同一個螢幕玩
+      </div>
     </div>
 
-    <div style="font-size:0.72rem; color: var(--red-dark); opacity:0.5; text-align:center; margin-top:12px;">
-      每個人有各自不同排列的賓果牌<br>開獎後自動標記，先連線的喊「賓果」！
+    <!-- Online Mode -->
+    <div id="onlineMode" style="display:none;">
+      <!-- Create Room -->
+      <div id="createRoomPanel">
+        <div class="input-group">
+          <label>👤 你的名字</label>
+          <input type="text" id="hostNameInput" placeholder="例：爸爸" autocomplete="off">
+        </div>
+        <div style="text-align:center; margin: 10px 0;">
+          <button class="login-btn" onclick="createRoom()">🎊 建立房間</button>
+          <button class="login-btn secondary" onclick="showJoinPanel()">🚪 加入房間</button>
+        </div>
+        <div style="font-size:0.72rem; color: var(--red-dark); opacity:0.5; text-align:center; margin-top:12px;">
+          線上模式：每個人用自己的手機，即時同步！
+        </div>
+      </div>
+
+      <!-- Join Room -->
+      <div id="joinRoomPanel" style="display:none;">
+        <div class="input-group">
+          <label>🎯 房間碼</label>
+          <input type="text" id="roomCodeInput" placeholder="輸入 6 位數房間碼" autocomplete="off" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div class="input-group">
+          <label>👤 你的名字</label>
+          <input type="text" id="playerNameInput" placeholder="例：媽媽" autocomplete="off">
+        </div>
+        <div style="text-align:center; margin: 10px 0;">
+          <button class="login-btn" onclick="joinRoom()">🚀 加入遊戲</button>
+          <button class="login-btn secondary" onclick="showCreatePanel()">← 返回</button>
+        </div>
+      </div>
+
+      <!-- Room Created -->
+      <div id="roomCreatedPanel" style="display:none;">
+        <div class="room-code-display">
+          <div class="label">房間碼</div>
+          <div class="code" id="displayRoomCode"></div>
+        </div>
+        <div style="font-size:0.82rem; color: var(--red-dark); text-align:center; margin: 12px 0;">
+          分享房間碼給其他玩家<br>等待玩家加入後即可開始開獎
+        </div>
+        <div style="text-align:center;">
+          <button class="login-btn" onclick="startOnlineGame()">🎊 開始遊戲</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -327,7 +424,7 @@ body {
 <div class="screen" id="gameScreen">
   <div class="top-bar">
     <div>
-      <div class="top-title">🏮 新春賓果</div>
+      <div class="top-title">🏮 新春賓果 <span id="syncBadge"></span></div>
       <div class="top-info" id="topInfo"></div>
     </div>
     <div class="top-right">
@@ -386,6 +483,42 @@ body {
 
 <script>
 // =========================================================
+// FIREBASE CONFIG
+// =========================================================
+// 🔥 請將以下配置替換成你自己的 Firebase 配置
+// 詳細設定步驟請參考 FIREBASE_SETUP.md
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  databaseURL: "YOUR_DATABASE_URL",  // ⚠️ 這個很重要！
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let firebaseEnabled = false;
+let db = null;
+let currentRoomRef = null;
+let currentRoomCode = null;
+let isHost = false;
+let gameMode = 'local'; // 'local' or 'online'
+
+// Initialize Firebase if config is valid
+try {
+  if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.databaseURL !== "YOUR_DATABASE_URL") {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    firebaseEnabled = true;
+    console.log('🔥 Firebase 已啟用');
+  } else {
+    console.log('ℹ️ Firebase 未設定，使用本地模式');
+  }
+} catch (e) {
+  console.log('ℹ️ Firebase 初始化失敗，使用本地模式', e);
+}
+
+// =========================================================
 // ITEMS
 // =========================================================
 const ALL_ITEMS = [
@@ -433,9 +566,220 @@ function makeCard(name) {
 }
 
 // =========================================================
+// MODE SWITCHING
+// =========================================================
+function switchMode(mode) {
+  gameMode = mode;
+  const buttons = document.querySelectorAll('.mode-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (mode === 'local') {
+    document.getElementById('localMode').style.display = 'block';
+    document.getElementById('onlineMode').style.display = 'none';
+  } else {
+    if (!firebaseEnabled) {
+      showToast('請先設定 Firebase（參考 FIREBASE_SETUP.md）');
+      setTimeout(() => switchMode('local'), 100);
+      return;
+    }
+    document.getElementById('localMode').style.display = 'none';
+    document.getElementById('onlineMode').style.display = 'block';
+  }
+}
+
+function showJoinPanel() {
+  document.getElementById('createRoomPanel').style.display = 'none';
+  document.getElementById('joinRoomPanel').style.display = 'block';
+}
+
+function showCreatePanel() {
+  document.getElementById('joinRoomPanel').style.display = 'none';
+  document.getElementById('createRoomPanel').style.display = 'block';
+}
+
+// =========================================================
+// ROOM MANAGEMENT
+// =========================================================
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+async function createRoom() {
+  const hostName = document.getElementById('hostNameInput').value.trim();
+  if (!hostName) {
+    showToast('請輸入你的名字');
+    return;
+  }
+
+  currentRoomCode = generateRoomCode();
+  currentRoomRef = db.ref('rooms/' + currentRoomCode);
+  isHost = true;
+
+  // Create room data
+  await currentRoomRef.set({
+    host: hostName,
+    players: { [hostName]: { name: hostName, joinedAt: Date.now() } },
+    calledItems: [],
+    createdAt: Date.now(),
+    gameStarted: false
+  });
+
+  // Setup player
+  players = [{
+    name: hostName,
+    card: makeCard(hostName),
+    lines: 0
+  }];
+
+  // Show room code
+  document.getElementById('displayRoomCode').textContent = currentRoomCode;
+  document.getElementById('createRoomPanel').style.display = 'none';
+  document.getElementById('roomCreatedPanel').style.display = 'block';
+
+  // Listen for new players
+  listenToRoom();
+
+  showToast('房間已建立！');
+}
+
+async function joinRoom() {
+  const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  const playerName = document.getElementById('playerNameInput').value.trim();
+
+  if (!roomCode || roomCode.length !== 6) {
+    showToast('請輸入 6 位數房間碼');
+    return;
+  }
+
+  if (!playerName) {
+    showToast('請輸入你的名字');
+    return;
+  }
+
+  currentRoomCode = roomCode;
+  currentRoomRef = db.ref('rooms/' + currentRoomCode);
+  isHost = false;
+
+  // Check if room exists
+  const snapshot = await currentRoomRef.once('value');
+  if (!snapshot.exists()) {
+    showToast('房間不存在');
+    return;
+  }
+
+  const roomData = snapshot.val();
+
+  // Check if name already taken
+  if (roomData.players && roomData.players[playerName]) {
+    showToast('名字已被使用');
+    return;
+  }
+
+  // Add player to room
+  await currentRoomRef.child('players').child(playerName).set({
+    name: playerName,
+    joinedAt: Date.now()
+  });
+
+  // Setup local player
+  players = [{
+    name: playerName,
+    card: makeCard(playerName),
+    lines: 0
+  }];
+
+  currentView = 0;
+
+  // Listen to room updates
+  listenToRoom();
+
+  // Start game
+  startOnlineGame();
+}
+
+function listenToRoom() {
+  if (!currentRoomRef) return;
+
+  // Listen for players
+  currentRoomRef.child('players').on('value', (snapshot) => {
+    const playersData = snapshot.val() || {};
+    const playerNames = Object.keys(playersData);
+
+    // Update players array if needed
+    if (isHost) {
+      players = playerNames.map(name => {
+        const existing = players.find(p => p.name === name);
+        return existing || {
+          name,
+          card: makeCard(name),
+          lines: 0
+        };
+      });
+    }
+
+    if (document.getElementById('gameScreen').classList.contains('active')) {
+      render();
+    }
+  });
+
+  // Listen for called items
+  currentRoomRef.child('calledItems').on('value', (snapshot) => {
+    const items = snapshot.val() || [];
+    if (items.length > calledItems.length || JSON.stringify(items) !== JSON.stringify(calledItems)) {
+      calledItems = items;
+
+      // Auto-mark all players
+      players.forEach(p => {
+        p.card.forEach(cell => {
+          if (cell.free) return;
+          const wasCalled = calledItems.some(c => c.e === cell.e && c.l === cell.l);
+          if (wasCalled) cell.marked = true;
+        });
+
+        // Recompute lines
+        const lines = getWinLines(p.card);
+        p.lines = lines.length;
+        p.card.forEach(c => c.winLine = false);
+        lines.forEach(line => line.forEach(i => p.card[i].winLine = true));
+      });
+
+      render();
+
+      // Check for new bingos
+      const myPlayerIndex = players.findIndex(p => p.name === (isHost ? players[0].name : players[currentView].name));
+      if (myPlayerIndex >= 0 && players[myPlayerIndex].lines > 0 && !winShownFor.has(myPlayerIndex)) {
+        winShownFor.add(myPlayerIndex);
+        showWin(players[myPlayerIndex].name);
+      }
+    }
+  });
+}
+
+function startOnlineGame() {
+  calledItems = [];
+  winShownFor = new Set();
+
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('gameScreen').classList.add('active');
+
+  const syncBadge = document.getElementById('syncBadge');
+  syncBadge.innerHTML = `<span class="sync-badge">📡 房間 ${currentRoomCode}</span>`;
+
+  document.getElementById('topInfo').textContent = `${players.length} 位玩家`;
+
+  render();
+}
+
+// =========================================================
 // START GAME
 // =========================================================
-function startGame() {
+function startLocalGame() {
   const raw = document.getElementById('namesInput').value.trim();
   if (!raw) { showToast('請輸入至少一個名字'); return; }
 
@@ -461,13 +805,45 @@ function startGame() {
 }
 
 function backToLogin() {
-  document.getElementById('gameScreen').classList.remove('active');
-  document.getElementById('loginScreen').classList.add('active');
-}
+  // Cleanup Firebase listeners
+  if (currentRoomRef) {
+    currentRoomRef.off();
+    if (isHost) {
+      currentRoomRef.remove(); // Delete room if host
+    }
+  }
 
-function resetGame() {
+  // Reset state
+  currentRoomRef = null;
+  currentRoomCode = null;
+  isHost = false;
+  players = [];
   calledItems = [];
   winShownFor = new Set();
+
+  document.getElementById('gameScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  document.getElementById('syncBadge').innerHTML = '';
+
+  // Reset panels
+  document.getElementById('createRoomPanel').style.display = 'block';
+  document.getElementById('joinRoomPanel').style.display = 'none';
+  document.getElementById('roomCreatedPanel').style.display = 'none';
+}
+
+async function resetGame() {
+  calledItems = [];
+  winShownFor = new Set();
+
+  if (gameMode === 'online' && currentRoomRef) {
+    if (!isHost) {
+      showToast('只有主持人可以重設遊戲');
+      return;
+    }
+    // Reset Firebase
+    await currentRoomRef.child('calledItems').set([]);
+  }
+
   players.forEach(p => {
     p.card = makeCard(p.name);
     p.lines = 0;
@@ -479,9 +855,15 @@ function resetGame() {
 // =========================================================
 // CALL NEXT
 // =========================================================
-function callNext() {
+async function callNext() {
   if (calledItems.length >= ALL_ITEMS.length) {
     showToast('所有項目都開完了！');
+    return;
+  }
+
+  // Online mode: only host can call
+  if (gameMode === 'online' && !isHost) {
+    showToast('只有主持人可以開獎');
     return;
   }
 
@@ -489,34 +871,44 @@ function callNext() {
   const uncalled = ALL_ITEMS.filter(it => !calledSet.has(it.e + it.l));
   const pick = uncalled[Math.floor(Math.random() * uncalled.length)];
 
-  calledItems.push({ e: pick.e, l: pick.l, round: calledItems.length + 1 });
+  const newItem = { e: pick.e, l: pick.l, round: calledItems.length + 1 };
 
-  // Auto-mark on all players
-  players.forEach(p => {
-    p.card.forEach(cell => {
-      if (!cell.free && cell.e === pick.e && cell.l === pick.l) {
-        cell.marked = true;
+  // Update Firebase or local
+  if (gameMode === 'online' && currentRoomRef) {
+    const updatedItems = [...calledItems, newItem];
+    await currentRoomRef.child('calledItems').set(updatedItems);
+    // Firebase listener will update local state
+  } else {
+    // Local mode
+    calledItems.push(newItem);
+
+    // Auto-mark on all players
+    players.forEach(p => {
+      p.card.forEach(cell => {
+        if (!cell.free && cell.e === pick.e && cell.l === pick.l) {
+          cell.marked = true;
+        }
+      });
+    });
+
+    // Check lines for all
+    players.forEach(p => {
+      const lines = getWinLines(p.card);
+      p.lines = lines.length;
+      p.card.forEach(c => c.winLine = false);
+      lines.forEach(line => line.forEach(i => p.card[i].winLine = true));
+    });
+
+    render();
+
+    // Check for new bingos
+    players.forEach((p, i) => {
+      if (p.lines > 0 && !winShownFor.has(i)) {
+        winShownFor.add(i);
+        showWin(p.name);
       }
     });
-  });
-
-  // Check lines for all
-  players.forEach(p => {
-    const lines = getWinLines(p.card);
-    p.lines = lines.length;
-    p.card.forEach(c => c.winLine = false);
-    lines.forEach(line => line.forEach(i => p.card[i].winLine = true));
-  });
-
-  render();
-
-  // Check for new bingos
-  players.forEach((p, i) => {
-    if (p.lines > 0 && !winShownFor.has(i)) {
-      winShownFor.add(i);
-      showWin(p.name);
-    }
-  });
+  }
 }
 
 // =========================================================
@@ -549,13 +941,27 @@ function render() {
 
 function renderPlayerTabs() {
   const el = document.getElementById('playerTabs');
-  el.innerHTML = players.map((p, i) => {
-    const active = i === currentView ? 'active' : '';
-    const bingo = p.lines > 0 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
-    return `<button class="ptab ${active}" onclick="switchView(${i})">
-      <span class="dot"></span>${p.name}${bingo}
-    </button>`;
-  }).join('');
+
+  if (gameMode === 'online') {
+    // Online mode: show all players but can't switch
+    el.innerHTML = players.map((p, i) => {
+      const isMe = i === 0; // First player is always "me" in online mode
+      const active = isMe ? 'active' : '';
+      const bingo = p.lines > 0 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
+      return `<button class="ptab ${active}" ${isMe ? '' : 'disabled style="opacity:0.5;cursor:default;"'}>
+        <span class="dot"></span>${p.name}${bingo}
+      </button>`;
+    }).join('');
+  } else {
+    // Local mode: show all players with switching
+    el.innerHTML = players.map((p, i) => {
+      const active = i === currentView ? 'active' : '';
+      const bingo = p.lines > 0 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
+      return `<button class="ptab ${active}" onclick="switchView(${i})">
+        <span class="dot"></span>${p.name}${bingo}
+      </button>`;
+    }).join('');
+  }
 }
 
 function switchView(idx) {
@@ -580,7 +986,8 @@ function renderCalledList() {
 }
 
 function renderCard() {
-  const p = players[currentView];
+  const viewIndex = gameMode === 'online' ? 0 : currentView; // Always show first player in online mode
+  const p = players[viewIndex];
   document.getElementById('cardTitle').textContent = `🧧 ${p.name} 的賓果牌`;
   document.getElementById('lineBadge').textContent = `連線：${p.lines}`;
 
@@ -600,7 +1007,10 @@ function renderCard() {
     }
     div.className = cls;
     div.innerHTML = `<span class="emoji">${cell.e}</span><span class="lbl">${cell.l}</span>`;
-    if (!cell.free) {
+
+    // In online mode, disable manual marking (auto-sync only)
+    // In local mode, allow manual marking
+    if (!cell.free && gameMode === 'local') {
       div.onclick = () => {
         cell.marked = !cell.marked;
         // Recompute lines
@@ -609,8 +1019,8 @@ function renderCard() {
         p.card.forEach(c => c.winLine = false);
         lines.forEach(line => line.forEach(j => p.card[j].winLine = true));
         render();
-        if (p.lines > 0 && !winShownFor.has(currentView)) {
-          winShownFor.add(currentView);
+        if (p.lines > 0 && !winShownFor.has(viewIndex)) {
+          winShownFor.add(viewIndex);
           showWin(p.name);
         }
       };
@@ -622,14 +1032,21 @@ function renderCard() {
 function renderTurnInfo() {
   const btn = document.getElementById('callBtn');
   const info = document.getElementById('turnInfo');
+
   if (calledItems.length >= ALL_ITEMS.length) {
     btn.disabled = true;
     btn.textContent = '🎊 全部開完了！';
     info.textContent = '';
   } else {
-    btn.disabled = false;
-    btn.textContent = '🎊 開獎！';
-    info.textContent = `第 ${calledItems.length + 1} / ${ALL_ITEMS.length} 輪`;
+    if (gameMode === 'online' && !isHost) {
+      btn.disabled = true;
+      btn.textContent = '⏳ 等待主持人開獎...';
+      info.textContent = `第 ${calledItems.length + 1} / ${ALL_ITEMS.length} 輪`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = '🎊 開獎！';
+      info.textContent = `第 ${calledItems.length + 1} / ${ALL_ITEMS.length} 輪`;
+    }
   }
 }
 
