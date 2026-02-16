@@ -141,6 +141,76 @@ body {
 }
 .btn-sm:hover { background: rgba(240,192,64,0.2); }
 
+/* Dice Animation Overlay */
+.dice-animation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s;
+}
+
+.dice-animation-overlay.active {
+  display: flex;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dice-animation-content {
+  text-align: center;
+}
+
+.dice-animation-title {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 2rem;
+  color: var(--gold);
+  margin-bottom: 30px;
+  text-shadow: 0 0 20px rgba(240,192,64,0.5);
+}
+
+.dice-big-container {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  align-items: center;
+}
+
+.die-big {
+  width: 120px;
+  height: 120px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 16px;
+  gap: 8px;
+  animation: diceAppear 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes diceAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-180deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.die-big .dot {
+  width: 16px;
+  height: 16px;
+}
+
 /* Dice Cup Container */
 .dice-cup-container {
   display: flex;
@@ -682,6 +752,16 @@ body {
 
 <div class="toast" id="toast"></div>
 
+<!-- Dice Animation Overlay (for all players) -->
+<div class="dice-animation-overlay" id="diceAnimationOverlay">
+  <div class="dice-animation-content">
+    <div class="dice-animation-title">🎲 開獎中...</div>
+    <div class="dice-big-container" id="diceBigContainer">
+      <!-- Will be filled by JS -->
+    </div>
+  </div>
+</div>
+
 <script>
 // Firebase config (same as bingo game)
 const firebaseConfig = {
@@ -959,15 +1039,8 @@ async function startGame() {
     bets: {}
   });
 
-  const resultDiv = document.getElementById('diceResult');
-  resultDiv.innerHTML = '';
-  resultDiv.style.position = 'static';
-  resultDiv.style.transform = 'none';
-  resultDiv.style.marginTop = '120px';
-
   document.getElementById('startGameBtn').style.display = 'none';
   document.getElementById('endBettingBtn').style.display = 'block';
-  startTimer(120);
 }
 
 // Banker ends betting early
@@ -1010,48 +1083,71 @@ function startTimer(seconds) {
   }, 1000);
 }
 
-// Roll dice
+// Roll dice (only banker calls this)
 async function rollDice() {
   document.getElementById('rollDiceBtn').style.display = 'none';
-  const cup = document.getElementById('cup');
-  const resultDiv = document.getElementById('diceResult');
 
-  cup.classList.add('shaking');
+  // Generate final result
+  const dice1 = Math.floor(Math.random() * 6) + 1;
+  const dice2 = Math.floor(Math.random() * 6) + 1;
 
-  // Show dice rolling animation inside cup
-  resultDiv.style.marginTop = '0';
-  resultDiv.style.position = 'absolute';
-  resultDiv.style.top = '50%';
-  resultDiv.style.left = '50%';
-  resultDiv.style.transform = 'translate(-50%, -50%)';
+  // Update to rolling state (triggers animation for all)
+  await currentRoomRef.update({
+    gameState: 'rollingAnimation',
+    diceResult: [dice1, dice2]
+  });
 
-  let animationInterval = setInterval(() => {
-    const random1 = Math.floor(Math.random() * 6) + 1;
-    const random2 = Math.floor(Math.random() * 6) + 1;
-    resultDiv.innerHTML = `
-      ${createDie(random1)}
-      ${createDie(random2)}
-    `;
-  }, 100);
-
+  // After animation duration, change to result state
   setTimeout(async () => {
-    clearInterval(animationInterval);
-    cup.classList.remove('shaking');
-
-    const dice1 = Math.floor(Math.random() * 6) + 1;
-    const dice2 = Math.floor(Math.random() * 6) + 1;
-
     await currentRoomRef.update({
-      diceResult: [dice1, dice2],
       gameState: 'result'
     });
+  }, 4000);
+}
 
-    // Reset position and show final result
-    resultDiv.style.position = 'static';
-    resultDiv.style.transform = 'none';
-    resultDiv.style.marginTop = '120px';
-    showDiceResult(dice1, dice2);
-  }, 2500);
+// Show dice animation overlay (for all players)
+function showDiceAnimation(finalDice1, finalDice2) {
+  const overlay = document.getElementById('diceAnimationOverlay');
+  const container = document.getElementById('diceBigContainer');
+  const title = document.querySelector('.dice-animation-title');
+
+  overlay.classList.add('active');
+  title.textContent = '🎲 開獎中...';
+
+  let elapsed = 0;
+  let interval = 100; // Start fast
+
+  const animationInterval = setInterval(() => {
+    elapsed += interval;
+
+    // Gradually slow down
+    if (elapsed > 1000) interval = 150;
+    if (elapsed > 2000) interval = 250;
+    if (elapsed > 2800) interval = 400;
+
+    const random1 = Math.floor(Math.random() * 6) + 1;
+    const random2 = Math.floor(Math.random() * 6) + 1;
+    container.innerHTML = `
+      ${createDie(random1, true)}
+      ${createDie(random2, true)}
+    `;
+
+    if (elapsed >= 3500) {
+      clearInterval(animationInterval);
+
+      // Show final result with emphasis
+      container.innerHTML = `
+        ${createDie(finalDice1, true)}
+        ${createDie(finalDice2, true)}
+      `;
+      title.textContent = `🎉 開出：${finalDice1} 和 ${finalDice2}`;
+
+      // Hide overlay after showing result
+      setTimeout(() => {
+        overlay.classList.remove('active');
+      }, 1500);
+    }
+  }, interval);
 }
 
 function showDiceResult(dice1, dice2) {
@@ -1062,9 +1158,9 @@ function showDiceResult(dice1, dice2) {
   `;
 }
 
-function createDie(num) {
+function createDie(num, isBig = false) {
   const dots = getDotPositions(num);
-  let html = '<div class="die">';
+  let html = `<div class="die${isBig ? '-big' : ''}">`;
   for (let i = 0; i < 9; i++) {
     html += dots[i] ? '<div class="dot"></div>' : '<div></div>';
   }
@@ -1085,6 +1181,7 @@ function getDotPositions(num) {
 }
 
 async function nextRound() {
+  // Only update Firebase, let updateGameUI handle the rest
   await currentRoomRef.update({
     gameState: 'betting',
     timer: 120,
@@ -1092,36 +1189,17 @@ async function nextRound() {
     bets: {}
   });
 
-  // Reset betting state
-  selectedChip = null;
-  myBets = {};
-  document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
-  updateMyBetsDisplay();
-
-  const resultDiv = document.getElementById('diceResult');
-  resultDiv.innerHTML = '';
-  resultDiv.style.position = 'static';
-  resultDiv.style.transform = 'none';
-  resultDiv.style.marginTop = '120px';
-
-  document.getElementById('resultPanel').style.display = 'none';
+  // Hide next round button for banker
   document.getElementById('nextRoundBtn').style.display = 'none';
-
-  // Clear winner highlights
-  for (let i = 1; i <= 6; i++) {
-    document.getElementById('betSpot' + i)?.classList.remove('winner');
-  }
 
   if (isBanker) {
     document.getElementById('endBettingBtn').style.display = 'block';
-  } else {
-    document.getElementById('bettingPanel').style.display = 'block';
   }
-
-  startTimer(120);
 }
 
 function updateGameUI(data) {
+  gameState = data.gameState || 'waiting';
+
   // Update bets on table
   if (data.bets) {
     for (let i = 1; i <= 6; i++) {
@@ -1147,6 +1225,34 @@ function updateGameUI(data) {
     }
   }
 
+  // Handle betting state for all players
+  if (data.gameState === 'betting') {
+    // Reset for new round
+    selectedChip = null;
+    myBets = {};
+    document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
+    updateMyBetsDisplay();
+
+    // Clear previous results
+    document.getElementById('diceResult').innerHTML = '';
+    document.getElementById('resultPanel').style.display = 'none';
+
+    // Clear winner highlights
+    for (let i = 1; i <= 6; i++) {
+      document.getElementById('betSpot' + i)?.classList.remove('winner');
+    }
+
+    // Show betting panel for players
+    if (!isBanker) {
+      document.getElementById('bettingPanel').style.display = 'block';
+    }
+
+    // Start timer for all
+    if (!timerInterval) {
+      startTimer(data.timer || 120);
+    }
+  }
+
   // Update game state
   if (data.gameState === 'rolling') {
     if (timerInterval) {
@@ -1163,6 +1269,20 @@ function updateGameUI(data) {
       document.getElementById('timerValue').textContent = '🎲';
       document.getElementById('timerValue').style.fontSize = '3rem';
     }
+  }
+
+  // Rolling animation (all players see this)
+  if (data.gameState === 'rollingAnimation' && data.diceResult) {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    // Hide banker controls during animation
+    document.getElementById('rollDiceBtn').style.display = 'none';
+
+    // Show animation for all players
+    showDiceAnimation(data.diceResult[0], data.diceResult[1]);
   }
 
   if (data.gameState === 'result' && data.diceResult) {
