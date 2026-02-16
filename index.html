@@ -764,9 +764,11 @@ function listenToRoom() {
   currentRoomRef.child('resetCounter').on('value', (snapshot) => {
     const counter = snapshot.val() || 0;
     if (counter > 0) {
-      // Reset all player cards
+      // Reset only my card
       players.forEach(p => {
-        p.card = makeCard(p.name);
+        if (p.name === myPlayerName) {
+          p.card = makeCard(p.name);
+        }
         p.lines = 0;
       });
       winShownFor = new Set();
@@ -797,16 +799,19 @@ function listenToRoom() {
     const playersData = snapshot.val() || {};
     const playerNames = Object.keys(playersData);
 
+    // Find my current card to preserve it
+    const myCurrentPlayer = players.find(p => p.name === myPlayerName);
+    const myCurrentCard = myCurrentPlayer ? myCurrentPlayer.card : null;
+
     // Update players array: keep my card, but update all players' info
     players = playerNames.map(name => {
-      const existing = players.find(p => p.name === name);
       const fbData = playersData[name];
 
       if (name === myPlayerName) {
-        // For myself: keep card, update lines from Firebase
+        // For myself: ALWAYS keep my current card (preserve marked state)
         return {
           name,
-          card: existing ? existing.card : makeCard(name),
+          card: myCurrentCard || makeCard(name),
           lines: fbData.lines || 0
         };
       } else {
@@ -830,36 +835,33 @@ function listenToRoom() {
     if (items.length > calledItems.length || JSON.stringify(items) !== JSON.stringify(calledItems)) {
       calledItems = items;
 
-      // Auto-mark my card
-      players.forEach(p => {
-        p.card.forEach(cell => {
+      // Auto-mark ONLY my card
+      const myPlayer = players.find(p => p.name === myPlayerName);
+      if (myPlayer && myPlayer.card && myPlayer.card.length > 0) {
+        myPlayer.card.forEach(cell => {
           if (cell.free) return;
           const wasCalled = calledItems.some(c => c.e === cell.e && c.l === cell.l);
           if (wasCalled) cell.marked = true;
         });
 
-        // Recompute lines
-        const lines = getWinLines(p.card);
-        p.lines = lines.length;
-        p.card.forEach(c => c.winLine = false);
-        lines.forEach(line => line.forEach(i => p.card[i].winLine = true));
-      });
+        // Recompute my lines
+        const lines = getWinLines(myPlayer.card);
+        myPlayer.lines = lines.length;
+        myPlayer.card.forEach(c => c.winLine = false);
+        lines.forEach(line => line.forEach(i => myPlayer.card[i].winLine = true));
 
-      // Update my lines count to Firebase
-      if (players.length > 0 && myPlayerName) {
-        const myLines = players[0].lines;
+        // Update my lines count to Firebase
         await currentRoomRef.child('players').child(myPlayerName).update({
-          lines: myLines
+          lines: myPlayer.lines
         });
-      }
 
-      render();
+        render();
 
-      // Check for new bingos
-      const myPlayerIndex = players.findIndex(p => p.name === myPlayerName);
-      if (myPlayerIndex >= 0 && players[myPlayerIndex].lines >= 5 && !winShownFor.has(myPlayerIndex)) {
-        winShownFor.add(myPlayerIndex);
-        showWin(players[myPlayerIndex].name);
+        // Check for my bingo
+        if (myPlayer.lines >= 5 && !winShownFor.has(myPlayerName)) {
+          winShownFor.add(myPlayerName);
+          showWin(myPlayer.name);
+        }
       }
     }
   });
