@@ -659,11 +659,8 @@ async function createRoom() {
     createdAt: Date.now()
   });
 
-  document.getElementById('displayRoomCode').textContent = currentRoomCode;
-  document.getElementById('createPanel').style.display = 'none';
-  document.getElementById('waitingPanel').style.display = 'block';
-
   listenToRoom();
+  startGameView();
   showToast('房間已建立！');
 }
 
