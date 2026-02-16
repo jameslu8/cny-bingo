@@ -1210,31 +1210,26 @@ function getDotPositions(num) {
 }
 
 async function nextRound() {
-  // Only update Firebase, let updateGameUI handle the rest
+  // Update Firebase to start new betting round
+  // updateGameUI will handle all the UI reset when it detects 'betting' state
   await currentRoomRef.update({
     gameState: 'betting',
     timer: 120,
     diceResult: null,
     bets: {}
   });
-
-  // Hide next round button for banker
-  document.getElementById('nextRoundBtn').style.display = 'none';
-
-  if (isBanker) {
-    document.getElementById('endBettingBtn').style.display = 'block';
-  }
 }
 
 function updateGameUI(data) {
   gameState = data.gameState || 'waiting';
 
-  // Update bets on table
-  if (data.bets) {
-    for (let i = 1; i <= 6; i++) {
-      const betsList = document.getElementById('betsList' + i);
-      if (betsList) {
-        const betsForNumber = [];
+  // Update bets on table (always update, even if empty)
+  for (let i = 1; i <= 6; i++) {
+    const betsList = document.getElementById('betsList' + i);
+    if (betsList) {
+      const betsForNumber = [];
+
+      if (data.bets) {
         Object.entries(data.bets).forEach(([playerName, playerBets]) => {
           if (typeof playerBets === 'object' && playerBets[i]) {
             betsForNumber.push({
@@ -1243,38 +1238,63 @@ function updateGameUI(data) {
             });
           }
         });
-
-        betsList.innerHTML = betsForNumber.map(bet =>
-          `<div class="bet-item">
-            <span class="bet-player">${bet.player}</span>
-            <span class="bet-amount">\$${bet.amount}</span>
-          </div>`
-        ).join('');
       }
+
+      betsList.innerHTML = betsForNumber.map(bet =>
+        `<div class="bet-item">
+          <span class="bet-player">${bet.player}</span>
+          <span class="bet-amount">\$${bet.amount}</span>
+        </div>`
+      ).join('');
     }
   }
 
   // Handle betting state for all players
   if (data.gameState === 'betting') {
-    // Reset for new round
+    // Reset betting state for new round
     selectedChip = null;
     myBets = {};
     document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
     updateMyBetsDisplay();
 
-    // Clear previous results
-    document.getElementById('diceResult').innerHTML = '';
-    document.getElementById('resultPanel').style.display = 'none';
+    // Clear dice result display
+    const diceResult = document.getElementById('diceResult');
+    diceResult.innerHTML = '';
+    diceResult.style.position = 'static';
+    diceResult.style.transform = 'none';
+    diceResult.style.marginTop = '120px';
 
-    // Clear winner highlights
+    // Clear result panel
+    document.getElementById('resultPanel').style.display = 'none';
+    document.getElementById('resultList').innerHTML = '';
+
+    // Clear winner highlights and my bet badges
     for (let i = 1; i <= 6; i++) {
-      document.getElementById('betSpot' + i)?.classList.remove('winner');
+      const spot = document.getElementById('betSpot' + i);
+      if (spot) {
+        spot.classList.remove('winner', 'has-my-bet');
+        const badge = spot.querySelector('.my-bet-on-spot');
+        if (badge) badge.remove();
+      }
     }
 
-    // Show betting panel for players
-    if (!isBanker) {
+    // Hide animation overlay if still showing
+    document.getElementById('diceAnimationOverlay').classList.remove('active');
+
+    // Reset banker/player UI
+    if (isBanker) {
+      document.getElementById('startGameBtn').style.display = 'none';
+      document.getElementById('endBettingBtn').style.display = 'block';
+      document.getElementById('rollDiceBtn').style.display = 'none';
+      document.getElementById('nextRoundBtn').style.display = 'none';
+    } else {
       document.getElementById('bettingPanel').style.display = 'block';
     }
+
+    // Reset timer display
+    document.getElementById('timerLabel').textContent = '下注時間';
+    document.getElementById('timerValue').style.fontSize = '2.5rem';
+    document.getElementById('timerValue').classList.remove('warning');
 
     // Start timer for all
     if (!timerInterval) {
