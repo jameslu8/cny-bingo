@@ -666,7 +666,7 @@ async function createRoom() {
   // Create room data
   await currentRoomRef.set({
     host: hostName,
-    players: { [hostName]: { name: hostName, joinedAt: Date.now() } },
+    players: { [hostName]: { name: hostName, joinedAt: Date.now(), lines: 0 } },
     calledItems: [],
     turnOrder: [hostName],
     currentTurn: hostName,
@@ -733,7 +733,8 @@ async function joinRoom() {
   // Add player to room
   await currentRoomRef.child('players').child(playerName).set({
     name: playerName,
-    joinedAt: Date.now()
+    joinedAt: Date.now(),
+    lines: 0
   });
 
   // Update turn order
@@ -796,17 +797,27 @@ function listenToRoom() {
     const playersData = snapshot.val() || {};
     const playerNames = Object.keys(playersData);
 
-    // Update players array if needed
-    if (isHost) {
-      players = playerNames.map(name => {
-        const existing = players.find(p => p.name === name);
-        return existing || {
+    // Update players array: keep my card, but update all players' info
+    players = playerNames.map(name => {
+      const existing = players.find(p => p.name === name);
+      const fbData = playersData[name];
+
+      if (name === myPlayerName) {
+        // For myself: keep card, update lines from Firebase
+        return {
           name,
-          card: makeCard(name),
-          lines: 0
+          card: existing ? existing.card : makeCard(name),
+          lines: fbData.lines || 0
         };
-      });
-    }
+      } else {
+        // For others: just store name and lines (no card needed)
+        return {
+          name,
+          card: [], // Empty card for other players
+          lines: fbData.lines || 0
+        };
+      }
+    });
 
     if (document.getElementById('gameScreen').classList.contains('active')) {
       render();
@@ -814,12 +825,12 @@ function listenToRoom() {
   });
 
   // Listen for called items
-  currentRoomRef.child('calledItems').on('value', (snapshot) => {
+  currentRoomRef.child('calledItems').on('value', async (snapshot) => {
     const items = snapshot.val() || [];
     if (items.length > calledItems.length || JSON.stringify(items) !== JSON.stringify(calledItems)) {
       calledItems = items;
 
-      // Auto-mark all players
+      // Auto-mark my card
       players.forEach(p => {
         p.card.forEach(cell => {
           if (cell.free) return;
@@ -833,6 +844,14 @@ function listenToRoom() {
         p.card.forEach(c => c.winLine = false);
         lines.forEach(line => line.forEach(i => p.card[i].winLine = true));
       });
+
+      // Update my lines count to Firebase
+      if (players.length > 0 && myPlayerName) {
+        const myLines = players[0].lines;
+        await currentRoomRef.child('players').child(myPlayerName).update({
+          lines: myLines
+        });
+      }
 
       render();
 
@@ -928,10 +947,20 @@ async function resetGame() {
     // Reset Firebase
     const snapshot = await currentRoomRef.child('resetCounter').once('value');
     const newCounter = (snapshot.val() || 0) + 1;
+
+    // Reset all players' lines to 0
+    const playersSnapshot = await currentRoomRef.child('players').once('value');
+    const playersData = playersSnapshot.val() || {};
+    const updates = {};
+    Object.keys(playersData).forEach(name => {
+      updates[`players/${name}/lines`] = 0;
+    });
+
     await currentRoomRef.update({
       calledItems: [],
       resetCounter: newCounter,
-      currentTurn: turnOrder[0] || ''
+      currentTurn: turnOrder[0] || '',
+      ...updates
     });
   }
 
@@ -1058,13 +1087,14 @@ function renderPlayerTabs() {
   const el = document.getElementById('playerTabs');
 
   if (gameMode === 'online') {
-    // Online mode: show all players but can't switch
+    // Online mode: show all players with their lines count
     el.innerHTML = players.map((p, i) => {
-      const isMe = i === 0; // First player is always "me" in online mode
+      const isMe = p.name === myPlayerName;
       const active = isMe ? 'active' : '';
-      const bingo = p.lines >= 5 ? `<span class="bingo-flag">BINGO ${p.lines}線</span>` : '';
-      return `<button class="ptab ${active}" ${isMe ? '' : 'disabled style="opacity:0.5;cursor:default;"'}>
-        <span class="dot"></span>${p.name}${bingo}
+      const lineInfo = p.lines > 0 ? ` (${p.lines}線)` : '';
+      const bingo = p.lines >= 5 ? `<span class="bingo-flag">BINGO!</span>` : '';
+      return `<button class="ptab ${active}">
+        <span class="dot"></span>${p.name}${lineInfo}${bingo}
       </button>`;
     }).join('');
   } else {
@@ -1101,7 +1131,13 @@ function renderCalledList() {
 }
 
 function renderCard() {
-  const viewIndex = gameMode === 'online' ? 0 : currentView; // Always show first player in online mode
+  // In online mode, always show my card; in local mode, show current view
+  const viewIndex = gameMode === 'online'
+    ? players.findIndex(p => p.name === myPlayerName)
+    : currentView;
+
+  if (viewIndex === -1) return; // Player not found
+
   const p = players[viewIndex];
   document.getElementById('cardTitle').textContent = `🧧 ${p.name} 的賓果牌`;
   document.getElementById('lineBadge').textContent = `連線：${p.lines}`;
