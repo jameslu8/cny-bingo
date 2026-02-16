@@ -162,6 +162,103 @@ body {
   to { opacity: 1; }
 }
 
+/* Result Celebration Overlay */
+.result-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.5s;
+  pointer-events: none;
+}
+
+.result-celebration-overlay.active {
+  display: flex;
+}
+
+.celebration-content {
+  text-align: center;
+  animation: celebrationZoom 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes celebrationZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.celebration-emoji {
+  font-size: 8rem;
+  margin-bottom: 20px;
+  animation: bounce 0.8s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-30px); }
+}
+
+.celebration-text {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 3rem;
+  font-weight: 900;
+  text-shadow: 0 0 30px currentColor;
+  margin-bottom: 15px;
+}
+
+.celebration-amount {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.celebration-win {
+  background: radial-gradient(circle, rgba(255,215,0,0.3) 0%, rgba(255,215,0,0) 70%);
+}
+
+.celebration-win .celebration-text {
+  color: var(--gold-bright);
+}
+
+.celebration-win .celebration-amount {
+  color: var(--green);
+}
+
+.celebration-lose {
+  background: radial-gradient(circle, rgba(100,100,100,0.3) 0%, rgba(100,100,100,0) 70%);
+}
+
+.celebration-lose .celebration-text {
+  color: #888;
+}
+
+.celebration-lose .celebration-amount {
+  color: #666;
+}
+
+/* Confetti */
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--gold);
+  animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+  to {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
 .dice-animation-content {
   text-align: center;
 }
@@ -781,6 +878,15 @@ body {
   </div>
 </div>
 
+<!-- Result Celebration Overlay (win/lose) -->
+<div class="result-celebration-overlay" id="resultCelebrationOverlay">
+  <div class="celebration-content" id="celebrationContent">
+    <div class="celebration-emoji" id="celebrationEmoji"></div>
+    <div class="celebration-text" id="celebrationText"></div>
+    <div class="celebration-amount" id="celebrationAmount"></div>
+  </div>
+</div>
+
 <script>
 // Firebase config (same as bingo game)
 const firebaseConfig = {
@@ -1179,6 +1285,56 @@ function showDiceAnimation(finalDice1, finalDice2) {
   }, interval);
 }
 
+// Show result celebration (win/lose) for player
+function showResultCelebration(netAmount) {
+  if (isBanker) return; // Only show for players who bet
+
+  const overlay = document.getElementById('resultCelebrationOverlay');
+  const emoji = document.getElementById('celebrationEmoji');
+  const text = document.getElementById('celebrationText');
+  const amount = document.getElementById('celebrationAmount');
+
+  // Clear previous confetti
+  document.querySelectorAll('.confetti').forEach(el => el.remove());
+
+  if (netAmount > 0) {
+    // WIN!
+    overlay.className = 'result-celebration-overlay celebration-win active';
+    emoji.textContent = '🎉';
+    text.textContent = '恭喜中獎！';
+    amount.textContent = `+$${netAmount}`;
+
+    // Create confetti
+    for (let i = 0; i < 50; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      confetti.style.left = Math.random() * 100 + '%';
+      confetti.style.top = -10 + 'px';
+      confetti.style.background = ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#95E1D3'][Math.floor(Math.random() * 5)];
+      confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+      confetti.style.animationDelay = (Math.random() * 0.5) + 's';
+      overlay.appendChild(confetti);
+    }
+  } else if (netAmount < 0) {
+    // LOSE
+    overlay.className = 'result-celebration-overlay celebration-lose active';
+    emoji.textContent = '😢';
+    text.textContent = '再接再厲！';
+    amount.textContent = `${netAmount}`;
+  } else {
+    // TIE (no bet or break even)
+    return;
+  }
+
+  // Hide after 3 seconds
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    setTimeout(() => {
+      document.querySelectorAll('.confetti').forEach(el => el.remove());
+    }, 500);
+  }, 3000);
+}
+
 function showDiceResult(dice1, dice2) {
   const resultDiv = document.getElementById('diceResult');
   resultDiv.innerHTML = `
@@ -1278,8 +1434,10 @@ function updateGameUI(data) {
       }
     }
 
-    // Hide animation overlay if still showing
+    // Hide animation and celebration overlays if still showing
     document.getElementById('diceAnimationOverlay').classList.remove('active');
+    document.getElementById('resultCelebrationOverlay').classList.remove('active');
+    document.querySelectorAll('.confetti').forEach(el => el.remove());
 
     // Reset banker/player UI
     if (isBanker) {
@@ -1338,6 +1496,28 @@ function updateGameUI(data) {
     showDiceResult(data.diceResult[0], data.diceResult[1]);
     showResults(data);
     highlightWinningSpots(data.diceResult);
+
+    // Calculate player's result and show celebration
+    if (!isBanker && data.bets && data.bets[myName]) {
+      let totalWin = 0;
+      let totalLose = 0;
+
+      Object.entries(data.bets[myName]).forEach(([number, amount]) => {
+        const matchCount = data.diceResult.filter(d => d === parseInt(number)).length;
+        if (matchCount > 0) {
+          totalWin += amount * matchCount;
+        } else {
+          totalLose += amount;
+        }
+      });
+
+      const netAmount = totalWin - totalLose;
+
+      // Show celebration after dice animation ends (delay 5 seconds)
+      setTimeout(() => {
+        showResultCelebration(netAmount);
+      }, 5000);
+    }
 
     // Reset timer display
     document.getElementById('timerLabel').textContent = '結果公布';
