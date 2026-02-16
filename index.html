@@ -838,7 +838,7 @@ function listenToRoom() {
 
       // Check for new bingos
       const myPlayerIndex = players.findIndex(p => p.name === myPlayerName);
-      if (myPlayerIndex >= 0 && players[myPlayerIndex].lines > 0 && !winShownFor.has(myPlayerIndex)) {
+      if (myPlayerIndex >= 0 && players[myPlayerIndex].lines >= 5 && !winShownFor.has(myPlayerIndex)) {
         winShownFor.add(myPlayerIndex);
         showWin(players[myPlayerIndex].name);
       }
