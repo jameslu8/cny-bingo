@@ -959,6 +959,12 @@ async function startGame() {
     bets: {}
   });
 
+  const resultDiv = document.getElementById('diceResult');
+  resultDiv.innerHTML = '';
+  resultDiv.style.position = 'static';
+  resultDiv.style.transform = 'none';
+  resultDiv.style.marginTop = '120px';
+
   document.getElementById('startGameBtn').style.display = 'none';
   document.getElementById('endBettingBtn').style.display = 'block';
   startTimer(120);
@@ -983,6 +989,7 @@ function startTimer(seconds) {
   const timerLabel = document.getElementById('timerLabel');
 
   timerLabel.textContent = '下注時間';
+  timerValue.style.fontSize = '2.5rem';
 
   timerInterval = setInterval(async () => {
     remaining--;
@@ -1007,9 +1014,28 @@ function startTimer(seconds) {
 async function rollDice() {
   document.getElementById('rollDiceBtn').style.display = 'none';
   const cup = document.getElementById('cup');
+  const resultDiv = document.getElementById('diceResult');
+
   cup.classList.add('shaking');
 
+  // Show dice rolling animation inside cup
+  resultDiv.style.marginTop = '0';
+  resultDiv.style.position = 'absolute';
+  resultDiv.style.top = '50%';
+  resultDiv.style.left = '50%';
+  resultDiv.style.transform = 'translate(-50%, -50%)';
+
+  let animationInterval = setInterval(() => {
+    const random1 = Math.floor(Math.random() * 6) + 1;
+    const random2 = Math.floor(Math.random() * 6) + 1;
+    resultDiv.innerHTML = `
+      ${createDie(random1)}
+      ${createDie(random2)}
+    `;
+  }, 100);
+
   setTimeout(async () => {
+    clearInterval(animationInterval);
     cup.classList.remove('shaking');
 
     const dice1 = Math.floor(Math.random() * 6) + 1;
@@ -1020,8 +1046,12 @@ async function rollDice() {
       gameState: 'result'
     });
 
+    // Reset position and show final result
+    resultDiv.style.position = 'static';
+    resultDiv.style.transform = 'none';
+    resultDiv.style.marginTop = '120px';
     showDiceResult(dice1, dice2);
-  }, 2000);
+  }, 2500);
 }
 
 function showDiceResult(dice1, dice2) {
@@ -1068,7 +1098,12 @@ async function nextRound() {
   document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
   updateMyBetsDisplay();
 
-  document.getElementById('diceResult').innerHTML = '';
+  const resultDiv = document.getElementById('diceResult');
+  resultDiv.innerHTML = '';
+  resultDiv.style.position = 'static';
+  resultDiv.style.transform = 'none';
+  resultDiv.style.marginTop = '120px';
+
   document.getElementById('resultPanel').style.display = 'none';
   document.getElementById('nextRoundBtn').style.display = 'none';
 
@@ -1113,12 +1148,20 @@ function updateGameUI(data) {
   }
 
   // Update game state
-  if (data.gameState === 'rolling' && isBanker) {
-    document.getElementById('endBettingBtn').style.display = 'none';
-    document.getElementById('rollDiceBtn').style.display = 'block';
+  if (data.gameState === 'rolling') {
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
+    }
+
+    if (isBanker) {
+      document.getElementById('endBettingBtn').style.display = 'none';
+      document.getElementById('rollDiceBtn').style.display = 'block';
+    } else {
+      // Show waiting message for players
+      document.getElementById('timerLabel').textContent = '等待開獎';
+      document.getElementById('timerValue').textContent = '🎲';
+      document.getElementById('timerValue').style.fontSize = '3rem';
     }
   }
 
@@ -1126,6 +1169,11 @@ function updateGameUI(data) {
     showDiceResult(data.diceResult[0], data.diceResult[1]);
     showResults(data);
     highlightWinningSpots(data.diceResult);
+
+    // Reset timer display
+    document.getElementById('timerLabel').textContent = '結果公布';
+    document.getElementById('timerValue').textContent = '✅';
+    document.getElementById('timerValue').style.fontSize = '2.5rem';
 
     if (isBanker) {
       document.getElementById('nextRoundBtn').style.display = 'block';
