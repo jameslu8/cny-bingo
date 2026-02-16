@@ -255,12 +255,37 @@ body {
   justify-content: center;
   position: relative;
   transition: all 0.3s;
+  cursor: pointer;
+}
+
+.bet-spot:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: var(--gold);
+  transform: scale(1.02);
+}
+
+.bet-spot.has-my-bet {
+  background: rgba(76,175,80,0.2);
+  border-color: var(--green);
 }
 
 .bet-spot.winner {
   background: rgba(255,215,0,0.3);
   border-color: var(--gold-bright);
   animation: winPulse 1s infinite;
+}
+
+.my-bet-on-spot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--green);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 @keyframes winPulse {
@@ -319,42 +344,11 @@ body {
   margin-bottom: 15px;
 }
 
-.number-select {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+.chip-select {
   margin-bottom: 20px;
 }
 
-.number-btn {
-  aspect-ratio: 1;
-  background: rgba(255,255,255,0.7);
-  border: 2px solid rgba(196,30,30,0.2);
-  border-radius: 12px;
-  font-family: 'ZCOOL KuaiLe', cursive;
-  font-size: 2rem;
-  color: var(--red-dark);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.number-btn:hover {
-  background: rgba(240,192,64,0.3);
-  border-color: var(--gold);
-}
-
-.number-btn.selected {
-  background: linear-gradient(135deg, var(--red), var(--red-dark));
-  color: var(--gold);
-  border-color: var(--gold);
-  transform: scale(1.05);
-}
-
-.amount-select {
-  margin-bottom: 20px;
-}
-
-.amount-label {
+.chip-label {
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--red-dark);
@@ -362,46 +356,112 @@ body {
   text-align: center;
 }
 
-.amount-buttons {
+.chip-buttons {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
 
-.amount-btn {
-  padding: 10px;
+.chip-btn {
+  padding: 12px 8px;
   background: rgba(255,255,255,0.7);
-  border: 2px solid rgba(196,30,30,0.2);
-  border-radius: 10px;
+  border: 3px solid rgba(196,30,30,0.2);
+  border-radius: 50%;
+  aspect-ratio: 1;
   font-weight: 700;
+  font-size: 0.9rem;
   color: var(--red-dark);
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.amount-btn:hover {
+.chip-btn:hover {
   background: rgba(240,192,64,0.3);
   border-color: var(--gold);
 }
 
-.amount-btn.selected {
+.chip-btn.selected {
   background: linear-gradient(135deg, var(--gold), var(--gold-dim));
   color: var(--red-deep);
   border-color: var(--red);
-  transform: scale(1.05);
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(240,192,64,0.5);
+}
+
+.betting-instruction {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--red-dark);
+  margin: 15px 0;
+  padding: 10px;
+  background: rgba(240,192,64,0.1);
+  border-radius: 10px;
+}
+
+.my-bets-summary {
+  background: rgba(76,175,80,0.1);
+  border: 2px solid var(--green);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 15px 0;
+}
+
+.my-bets-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.my-bets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.my-bet-item {
+  background: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 2px solid var(--green);
+}
+
+.my-bet-number {
+  color: var(--red);
+}
+
+.my-bet-amount {
+  color: var(--green);
+}
+
+.betting-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.confirm-bet-btn, .reset-bet-btn {
+  padding: 15px;
+  border: 2px solid;
+  border-radius: 16px;
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .confirm-bet-btn {
-  width: 100%;
-  padding: 15px;
   background: linear-gradient(135deg, var(--green), #2E7D32);
   color: white;
-  border: 2px solid #1B5E20;
-  border-radius: 16px;
-  font-family: 'ZCOOL KuaiLe', cursive;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.2s;
+  border-color: #1B5E20;
 }
 
 .confirm-bet-btn:hover { transform: translateY(-2px); }
@@ -410,6 +470,18 @@ body {
   color: #666;
   cursor: not-allowed;
   transform: none;
+  border-color: #999;
+}
+
+.reset-bet-btn {
+  background: rgba(255,255,255,0.7);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.reset-bet-btn:hover {
+  background: rgba(255,255,255,0.9);
+  transform: translateY(-2px);
 }
 
 /* Result Panel */
@@ -557,22 +629,32 @@ body {
 
   <!-- Player Betting Panel -->
   <div class="betting-panel" id="bettingPanel" style="display:none;">
-    <div class="panel-title">選擇點數和金額</div>
+    <div class="panel-title">下注區</div>
 
-    <div class="number-select" id="numberSelect">
-      <!-- Will be filled by JS -->
-    </div>
-
-    <div class="amount-select">
-      <div class="amount-label">下注金額</div>
-      <div class="amount-buttons" id="amountButtons">
+    <div class="chip-select">
+      <div class="chip-label">選擇籌碼</div>
+      <div class="chip-buttons" id="chipButtons">
         <!-- Will be filled by JS -->
       </div>
     </div>
 
-    <button class="confirm-bet-btn" id="confirmBetBtn" onclick="confirmBet()" disabled>
-      確認下注
-    </button>
+    <div class="betting-instruction">
+      💡 選擇籌碼後，點擊賭桌上的數字下注
+    </div>
+
+    <div class="my-bets-summary" id="myBetsSummary" style="display:none;">
+      <div class="my-bets-title">📋 我的下注</div>
+      <div class="my-bets-list" id="myBetsList"></div>
+    </div>
+
+    <div class="betting-actions">
+      <button class="reset-bet-btn" onclick="resetMyBets()">
+        🔄 重置
+      </button>
+      <button class="confirm-bet-btn" id="confirmBetBtn" onclick="confirmBet()" disabled>
+        ✅ 確認
+      </button>
+    </div>
   </div>
 
   <!-- Banker Controls -->
@@ -750,6 +832,7 @@ function initializeBettingTable() {
     const spot = document.createElement('div');
     spot.className = 'bet-spot';
     spot.id = 'betSpot' + i;
+    spot.onclick = () => placeBetOnNumber(i);
     spot.innerHTML = `
       <div class="bet-number">${i}</div>
       <div class="bets-list" id="betsList${i}"></div>
@@ -759,63 +842,111 @@ function initializeBettingTable() {
 }
 
 function initializeBettingControls() {
-  // Number buttons
-  const numberSelect = document.getElementById('numberSelect');
-  numberSelect.innerHTML = '';
-  for (let i = 1; i <= 6; i++) {
-    const btn = document.createElement('button');
-    btn.className = 'number-btn';
-    btn.textContent = i;
-    btn.onclick = () => selectNumber(i);
-    btn.id = 'numBtn' + i;
-    numberSelect.appendChild(btn);
-  }
-
-  // Amount buttons
-  const amountButtons = document.getElementById('amountButtons');
-  amountButtons.innerHTML = '';
+  // Chip buttons
+  const chipButtons = document.getElementById('chipButtons');
+  chipButtons.innerHTML = '';
   [10, 20, 30, 40, 50].forEach(amount => {
     const btn = document.createElement('button');
-    btn.className = 'amount-btn';
+    btn.className = 'chip-btn';
     btn.textContent = amount;
-    btn.onclick = () => selectAmount(amount);
-    btn.id = 'amtBtn' + amount;
-    amountButtons.appendChild(btn);
+    btn.onclick = () => selectChip(amount);
+    btn.id = 'chipBtn' + amount;
+    chipButtons.appendChild(btn);
   });
 }
 
-let selectedNumber = null;
-let selectedAmount = null;
+let selectedChip = null;
+let myBets = {}; // { number: amount }
 
-function selectNumber(num) {
-  selectedNumber = num;
-  document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('selected'));
-  document.getElementById('numBtn' + num).classList.add('selected');
-  updateConfirmButton();
+function selectChip(amount) {
+  selectedChip = amount;
+  document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
+  document.getElementById('chipBtn' + amount).classList.add('selected');
 }
 
-function selectAmount(amt) {
-  selectedAmount = amt;
-  document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
-  document.getElementById('amtBtn' + amt).classList.add('selected');
-  updateConfirmButton();
+function placeBetOnNumber(number) {
+  if (!selectedChip) {
+    showToast('請先選擇籌碼金額');
+    return;
+  }
+
+  if (gameState !== 'betting') {
+    showToast('目前無法下注');
+    return;
+  }
+
+  // Add or accumulate bet
+  if (myBets[number]) {
+    myBets[number] += selectedChip;
+  } else {
+    myBets[number] = selectedChip;
+  }
+
+  updateMyBetsDisplay();
+  showToast(`在 ${number} 點加注 \$${selectedChip}`);
 }
 
-function updateConfirmButton() {
-  const btn = document.getElementById('confirmBetBtn');
-  btn.disabled = !(selectedNumber && selectedAmount);
+function updateMyBetsDisplay() {
+  const summary = document.getElementById('myBetsSummary');
+  const list = document.getElementById('myBetsList');
+
+  if (Object.keys(myBets).length === 0) {
+    summary.style.display = 'none';
+    document.getElementById('confirmBetBtn').disabled = true;
+
+    // Remove highlights from spots
+    for (let i = 1; i <= 6; i++) {
+      const spot = document.getElementById('betSpot' + i);
+      spot.classList.remove('has-my-bet');
+      const existing = spot.querySelector('.my-bet-on-spot');
+      if (existing) existing.remove();
+    }
+    return;
+  }
+
+  summary.style.display = 'block';
+  document.getElementById('confirmBetBtn').disabled = false;
+
+  // Update list
+  list.innerHTML = Object.entries(myBets).map(([num, amt]) =>
+    `<div class="my-bet-item">
+      <span class="my-bet-number">${num}點</span>:
+      <span class="my-bet-amount">\$${amt}</span>
+    </div>`
+  ).join('');
+
+  // Highlight spots with bets
+  for (let i = 1; i <= 6; i++) {
+    const spot = document.getElementById('betSpot' + i);
+    const existing = spot.querySelector('.my-bet-on-spot');
+    if (existing) existing.remove();
+
+    if (myBets[i]) {
+      spot.classList.add('has-my-bet');
+      const badge = document.createElement('div');
+      badge.className = 'my-bet-on-spot';
+      badge.textContent = '\$' + myBets[i];
+      spot.appendChild(badge);
+    } else {
+      spot.classList.remove('has-my-bet');
+    }
+  }
+}
+
+function resetMyBets() {
+  myBets = {};
+  updateMyBetsDisplay();
+  showToast('已重置下注');
 }
 
 async function confirmBet() {
-  if (!selectedNumber || !selectedAmount) return;
+  if (Object.keys(myBets).length === 0) return;
 
-  await currentRoomRef.child('bets').child(myName).set({
-    number: selectedNumber,
-    amount: selectedAmount,
-    player: myName
-  });
+  // Save bets to Firebase
+  await currentRoomRef.child('bets').child(myName).set(myBets);
 
-  showToast(`已下注 ${selectedNumber} 點，金額 ${selectedAmount}`);
+  const total = Object.values(myBets).reduce((sum, amt) => sum + amt, 0);
+  showToast(`已確認下注，總金額 \$${total}`);
   document.getElementById('bettingPanel').style.display = 'none';
 }
 
@@ -931,15 +1062,20 @@ async function nextRound() {
     bets: {}
   });
 
-  selectedNumber = null;
-  selectedAmount = null;
-  document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('selected'));
-  document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
-  updateConfirmButton();
+  // Reset betting state
+  selectedChip = null;
+  myBets = {};
+  document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
+  updateMyBetsDisplay();
 
   document.getElementById('diceResult').innerHTML = '';
   document.getElementById('resultPanel').style.display = 'none';
   document.getElementById('nextRoundBtn').style.display = 'none';
+
+  // Clear winner highlights
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById('betSpot' + i)?.classList.remove('winner');
+  }
 
   if (isBanker) {
     document.getElementById('endBettingBtn').style.display = 'block';
@@ -956,7 +1092,16 @@ function updateGameUI(data) {
     for (let i = 1; i <= 6; i++) {
       const betsList = document.getElementById('betsList' + i);
       if (betsList) {
-        const betsForNumber = Object.values(data.bets).filter(bet => bet.number === i);
+        const betsForNumber = [];
+        Object.entries(data.bets).forEach(([playerName, playerBets]) => {
+          if (typeof playerBets === 'object' && playerBets[i]) {
+            betsForNumber.push({
+              player: playerName,
+              amount: playerBets[i]
+            });
+          }
+        });
+
         betsList.innerHTML = betsForNumber.map(bet =>
           `<div class="bet-item">
             <span class="bet-player">${bet.player}</span>
@@ -1008,13 +1153,29 @@ function showResults(data) {
   if (!data.bets || !data.diceResult) return;
 
   const results = [];
-  Object.values(data.bets).forEach(bet => {
-    const matchCount = data.diceResult.filter(d => d === bet.number).length;
-    const winAmount = bet.amount * matchCount;
-    const outcome = matchCount > 0 ? 'win' : 'lose';
-    const text = matchCount > 0 ? `贏 \$${winAmount}` : `輸 \$${bet.amount}`;
 
-    results.push({ player: bet.player, outcome, text });
+  Object.entries(data.bets).forEach(([playerName, playerBets]) => {
+    if (typeof playerBets !== 'object') return;
+
+    let totalWin = 0;
+    let totalLose = 0;
+
+    Object.entries(playerBets).forEach(([number, amount]) => {
+      const matchCount = data.diceResult.filter(d => d === parseInt(number)).length;
+      if (matchCount > 0) {
+        totalWin += amount * matchCount;
+      } else {
+        totalLose += amount;
+      }
+    });
+
+    const netAmount = totalWin - totalLose;
+    const outcome = netAmount > 0 ? 'win' : (netAmount < 0 ? 'lose' : 'lose');
+    const text = netAmount > 0
+      ? `贏 \$${netAmount}`
+      : (netAmount < 0 ? `輸 \$${Math.abs(netAmount)}` : '打平');
+
+    results.push({ player: playerName, outcome, text });
   });
 
   resultList.innerHTML = results.map(r =>
