@@ -500,7 +500,7 @@ body {
     <div id="joinPanel" style="display:none;">
       <div class="input-group">
         <label>🎯 房間碼</label>
-        <input type="text" id="roomCodeInput" placeholder="輸入 6 位數房間碼" maxlength="6" style="text-transform:uppercase;">
+        <input type="text" id="roomCodeInput" placeholder="輸入 6 位數驗證碼" maxlength="6" inputmode="numeric" pattern="[0-9]*">
       </div>
       <div class="input-group">
         <label>👤 你的名字</label>
@@ -512,7 +512,7 @@ body {
 
     <div id="waitingPanel" style="display:none;">
       <div class="room-code-display">
-        <div class="label">房間碼</div>
+        <div class="label">驗證碼</div>
         <div class="code" id="displayRoomCode"></div>
       </div>
       <div style="text-align:center; font-size:0.85rem; color: var(--red-dark); margin: 15px 0;">
@@ -628,12 +628,7 @@ try {
 
 // Generate room code
 function generateRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // Create room
