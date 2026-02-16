@@ -580,6 +580,9 @@ body {
     <button class="login-btn" onclick="startGame()" id="startGameBtn">
       🎯 開始遊戲
     </button>
+    <button class="login-btn" onclick="endBetting()" id="endBettingBtn" style="display:none;">
+      ⏭️ 結束下注
+    </button>
     <button class="login-btn" onclick="rollDice()" id="rollDiceBtn" style="display:none;">
       🎲 搖骰子
     </button>
@@ -826,7 +829,19 @@ async function startGame() {
   });
 
   document.getElementById('startGameBtn').style.display = 'none';
+  document.getElementById('endBettingBtn').style.display = 'block';
   startTimer(120);
+}
+
+// Banker ends betting early
+async function endBetting() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  await currentRoomRef.update({ gameState: 'rolling' });
+  document.getElementById('endBettingBtn').style.display = 'none';
 }
 
 let timerInterval = null;
@@ -926,7 +941,9 @@ async function nextRound() {
   document.getElementById('resultPanel').style.display = 'none';
   document.getElementById('nextRoundBtn').style.display = 'none';
 
-  if (!isBanker) {
+  if (isBanker) {
+    document.getElementById('endBettingBtn').style.display = 'block';
+  } else {
     document.getElementById('bettingPanel').style.display = 'block';
   }
 
@@ -952,7 +969,12 @@ function updateGameUI(data) {
 
   // Update game state
   if (data.gameState === 'rolling' && isBanker) {
+    document.getElementById('endBettingBtn').style.display = 'none';
     document.getElementById('rollDiceBtn').style.display = 'block';
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
   }
 
   if (data.gameState === 'result' && data.diceResult) {
