@@ -689,6 +689,35 @@ body {
 .result-outcome.win { color: var(--green); }
 .result-outcome.lose { color: #888; }
 
+/* Scoreboard */
+.scoreboard {
+  background: rgba(0,0,0,0.3);
+  border: 1.5px solid rgba(240,192,64,0.2);
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin: 15px 0;
+  backdrop-filter: blur(8px);
+}
+.scoreboard-title {
+  font-size: 0.72rem; color: var(--gold-dim); font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 8px; text-align: center;
+}
+.scoreboard-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.score-chip {
+  padding: 6px 14px;
+  background: var(--glass);
+  border: 1.5px solid rgba(240,192,64,0.25);
+  border-radius: 20px;
+  font-size: 0.82rem; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+}
+.score-name { color: var(--cream); }
+.score-amount { font-family: 'ZCOOL KuaiLe', cursive; }
+.score-amount.positive { color: var(--green); }
+.score-amount.negative { color: #FF5722; }
+.score-amount.zero { color: var(--gold-dim); }
+.result-balance { font-size: 0.75rem; color: var(--gold-dim); margin-top: 2px; }
+
 /* Toast */
 .toast {
   position: fixed;
@@ -859,6 +888,12 @@ body {
     </button>
   </div>
 
+  <!-- Scoreboard -->
+  <div class="scoreboard" id="scoreboard">
+    <div class="scoreboard-title">💰 累計戰績</div>
+    <div class="scoreboard-list" id="scoreboardList"></div>
+  </div>
+
   <!-- Result Panel -->
   <div class="result-panel" id="resultPanel" style="display:none;">
     <div class="result-title">本局結果</div>
@@ -907,6 +942,8 @@ let myName = '';
 let gameState = 'waiting'; // waiting, betting, rolling, result
 let fromLobby = false;
 let lobbyParams = null;
+let playerBalances = {}; // { playerName: cumulative net amount }
+let lastResultProcessed = false; // prevent double-counting results
 
 // Initialize Firebase
 try {
@@ -1020,6 +1057,12 @@ function listenToRoom() {
 
     gameState = data.gameState || 'waiting';
 
+    // Sync balances from Firebase
+    if (data.balances) {
+      playerBalances = { ...data.balances };
+      renderScoreboard();
+    }
+
     // Update UI based on game state
     updateGameUI(data);
   });
@@ -1031,6 +1074,7 @@ function startGameView() {
   document.getElementById('roomCodeDisplay').textContent = currentRoomCode;
 
   initializeBettingTable();
+  renderScoreboard();
 
   if (isBanker) {
     document.getElementById('diceCupContainer').style.display = 'flex';
@@ -1410,6 +1454,7 @@ function updateGameUI(data) {
   // Handle betting state for all players
   if (data.gameState === 'betting') {
     // Reset betting state for new round
+    lastResultProcessed = false;
     selectedChip = null;
     myBets = {};
     document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
@@ -1496,7 +1541,10 @@ function updateGameUI(data) {
 
   if (data.gameState === 'result' && data.diceResult) {
     showDiceResult(data.diceResult[0], data.diceResult[1]);
-    showResults(data);
+    if (!lastResultProcessed) {
+      lastResultProcessed = true;
+      showResults(data);
+    }
     highlightWinningSpots(data.diceResult);
 
     // Calculate player's result and show celebration
@@ -1574,17 +1622,55 @@ function showResults(data) {
       ? `贏 \$${netAmount}`
       : (netAmount < 0 ? `輸 \$${Math.abs(netAmount)}` : '打平');
 
-    results.push({ player: playerName, outcome, text });
+    // Update cumulative balance
+    if (!playerBalances[playerName]) playerBalances[playerName] = 0;
+    playerBalances[playerName] += netAmount;
+
+    const cumulative = playerBalances[playerName];
+    const balanceText = cumulative > 0 ? `累計 +$${cumulative}` : (cumulative < 0 ? `累計 $${cumulative}` : '累計 $0');
+
+    results.push({ player: playerName, outcome, text, balanceText });
   });
+
+  // Save balances to Firebase
+  if (isBanker && currentRoomRef) {
+    currentRoomRef.child('balances').set(playerBalances);
+  }
 
   resultList.innerHTML = results.map(r =>
     `<div class="result-item">
-      <span class="result-player">${r.player}</span>
+      <span class="result-player">
+        ${r.player}
+        <div class="result-balance">${r.balanceText}</div>
+      </span>
       <span class="result-outcome ${r.outcome}">${r.text}</span>
     </div>`
   ).join('');
 
   resultPanel.style.display = 'block';
+  renderScoreboard();
+}
+
+function renderScoreboard() {
+  const list = document.getElementById('scoreboardList');
+  const entries = Object.entries(playerBalances);
+
+  if (entries.length === 0) {
+    list.innerHTML = '<span style="color:var(--gold-dim); font-size:0.8rem; opacity:0.5;">尚無紀錄</span>';
+    return;
+  }
+
+  // Sort by balance descending
+  entries.sort((a, b) => b[1] - a[1]);
+
+  list.innerHTML = entries.map(([name, balance]) => {
+    const cls = balance > 0 ? 'positive' : (balance < 0 ? 'negative' : 'zero');
+    const prefix = balance > 0 ? '+' : '';
+    return `<div class="score-chip">
+      <span class="score-name">${name}</span>
+      <span class="score-amount ${cls}">${prefix}$${balance}</span>
+    </div>`;
+  }).join('');
 }
 
 function backToLogin() {
