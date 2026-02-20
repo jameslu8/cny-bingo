@@ -20,6 +20,13 @@
         ".write": true,
         ".indexOn": ["createdAt"]
       }
+    },
+    "hongbaoRooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["createdAt"]
+      }
     }
   }
 }

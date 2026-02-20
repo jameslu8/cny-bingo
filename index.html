@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🧧 老頑童家族 遊戲中心</title>
+<title>🧧 盧氏集團馬上有錢 遊戲中心</title>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -289,7 +289,7 @@ body {
 <div class="screen active" id="welcomeScreen">
   <div class="header">
     <div class="header-emoji">🏮🧧🏮</div>
-    <h1 class="title">老頑童家族</h1>
+    <h1 class="title">盧氏集團馬上有錢</h1>
     <p class="subtitle">遊戲中心</p>
   </div>
 
@@ -332,7 +332,7 @@ body {
   <div class="lobby-container">
     <div class="lobby-header">
       <div class="header-emoji" style="font-size:3rem;">🏮🧧🏮</div>
-      <h1 class="title" style="font-size:2rem;">老頑童家族</h1>
+      <h1 class="title" style="font-size:2rem;">盧氏集團馬上有錢</h1>
     </div>
 
     <div class="lobby-room-code">
@@ -362,6 +362,15 @@ body {
           <div class="game-desc">
             押 1-6 點數，下注 10-50<br>
             中一顆賺 1 倍，兩顆賺 2 倍！
+          </div>
+        </div>
+
+        <div class="game-card" onclick="startGame('hongbao')" id="hongbaoCard">
+          <div class="game-icon">🧧</div>
+          <div class="game-title">搶紅包</div>
+          <div class="game-desc">
+            主持人發紅包，大家一起搶<br>
+            手氣最佳是誰？
           </div>
         </div>
       </div>
@@ -603,6 +612,8 @@ function navigateToGame(game) {
     window.location.href = 'bingo.html?' + params.toString();
   } else if (game === 'dice') {
     window.location.href = 'dice.html?' + params.toString();
+  } else if (game === 'hongbao') {
+    window.location.href = 'hongbao.html?' + params.toString();
   }
 }
 

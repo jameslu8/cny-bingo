@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🧧 盧氏集團搶紅包</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap');
+
+:root {
+  --red: #C41E1E;
+  --red-dark: #7A0000;
+  --red-deep: #520000;
+  --gold: #F0C040;
+  --gold-bright: #FFD700;
+  --gold-dim: #B8860B;
+  --cream: #FFF8E8;
+  --cream-dark: #F5E6C8;
+  --ink: #1A0505;
+  --glass: rgba(0,0,0,0.25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow-x: hidden; }
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background: var(--red-deep);
+  color: var(--cream);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bg {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(240,192,64,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(196,30,30,0.15) 0%, transparent 40%),
+    linear-gradient(175deg, #520000 0%, #7A0000 35%, #520000 70%, #3A0000 100%);
+}
+
+.particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.particle {
+  position: absolute; opacity: 0.2;
+  animation: drift linear infinite;
+}
+@keyframes drift {
+  0% { transform: translateY(105vh) rotate(0deg); opacity: 0; }
+  8% { opacity: 0.25; }
+  85% { opacity: 0.25; }
+  100% { transform: translateY(-5vh) rotate(30deg) scale(0.7); opacity: 0; }
+}
+
+/* Screens */
+.screen { display: none; position: relative; z-index: 1; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* LOGIN */
+#loginScreen { align-items: center; justify-content: center; padding: 30px 20px; }
+
+.login-card {
+  background: linear-gradient(160deg, rgba(255,248,232,0.96), rgba(245,230,200,0.93));
+  border: 3px solid var(--gold);
+  border-radius: 24px;
+  padding: 36px 28px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 8px 60px rgba(0,0,0,0.4);
+  color: var(--ink);
+  animation: cardUp 0.7s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes cardUp { from { opacity:0; transform: translateY(40px) scale(0.9); } to { opacity:1; transform: translateY(0) scale(1); } }
+
+.login-header { font-size: 3rem; text-align: center; margin-bottom: 8px; }
+.login-title { font-family: 'ZCOOL KuaiLe', cursive; font-size: 2rem; color: var(--red); text-align: center; margin-bottom: 6px; }
+.login-sub { font-size: 0.82rem; color: var(--red-dark); opacity: 0.65; text-align: center; margin-bottom: 24px; }
+
+.input-group { margin-bottom: 14px; }
+.input-group label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--red-dark); margin-bottom: 5px; opacity: 0.8; }
+.input-group input {
+  width: 100%; padding: 13px 15px;
+  border: 2px solid rgba(196,30,30,0.18);
+  border-radius: 13px;
+  font-family: 'Noto Sans TC', sans-serif; font-size: 1.05rem;
+  background: rgba(255,255,255,0.7); color: var(--ink);
+  outline: none; transition: border-color 0.2s;
+}
+.input-group input:focus { border-color: var(--gold); }
+
+.login-btn {
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: var(--gold-bright); border: 2px solid var(--gold);
+  border-radius: 16px;
+  font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.25rem;
+  cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(122,0,0,0.3); margin-top: 6px;
+}
+.login-btn:hover { transform: translateY(-2px); }
+.login-btn:active { transform: scale(0.97); }
+.login-btn.secondary {
+  background: rgba(255,255,255,0.6);
+  color: var(--red-dark);
+  font-size: 1rem; padding: 12px;
+  box-shadow: 0 2px 12px rgba(122,0,0,0.15);
+  margin-top: 10px;
+}
+
+.room-code-display {
+  background: rgba(240,192,64,0.15); border: 2px solid var(--gold);
+  border-radius: 12px; padding: 12px; margin: 16px 0; text-align: center;
+}
+.room-code-display .label { font-size: 0.7rem; color: var(--red-dark); opacity: 0.7; margin-bottom: 4px; }
+.room-code-display .code { font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.8rem; color: var(--red); letter-spacing: 4px; }
+
+/* GAME */
+#gameScreen { padding: 15px; max-width: 100vw; overflow-x: hidden; }
+
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; padding: 12px 16px;
+  background: rgba(0,0,0,0.3); border-radius: 16px;
+}
+.top-title { font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.4rem; color: var(--gold); }
+.top-info { font-size: 0.8rem; color: var(--gold-dim); margin-top: 4px; }
+.btn-sm {
+  padding: 8px 16px; border: 2px solid var(--gold);
+  border-radius: 20px; background: var(--glass);
+  color: var(--gold); font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-sm:hover { background: rgba(240,192,64,0.2); }
+
+/* Player list */
+.player-section {
+  background: rgba(0,0,0,0.3); border: 1.5px solid rgba(240,192,64,0.2);
+  border-radius: 16px; padding: 14px; margin-bottom: 16px;
+  backdrop-filter: blur(8px);
+}
+.player-section-title {
+  font-size: 0.72rem; color: var(--gold-dim); font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 8px; text-align: center;
+}
+.player-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.p-chip {
+  padding: 6px 14px; background: var(--glass);
+  border: 1.5px solid rgba(240,192,64,0.25); border-radius: 20px;
+  color: var(--cream); font-size: 0.82rem; font-weight: 700;
+}
+.p-chip.host { border-color: var(--gold); color: var(--gold); }
+
+/* Host controls */
+.host-panel {
+  background: linear-gradient(160deg, rgba(255,248,232,0.96), rgba(245,230,200,0.93));
+  border: 3px solid var(--gold); border-radius: 20px;
+  padding: 20px; margin-bottom: 16px; color: var(--ink);
+}
+.host-panel-title {
+  font-family: 'ZCOOL KuaiLe', cursive; font-size: 1.3rem;
+  color: var(--red); text-align: center; margin-bottom: 16px;
+}
+.amount-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.amount-btn {
+  padding: 12px 8px; background: rgba(255,255,255,0.7);
+  border: 3px solid rgba(196,30,30,0.2); border-radius: 12px;
+  font-weight: 700; font-size: 0.95rem; color: var(--red-dark);
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.amount-btn:hover { border-color: var(--gold); background: rgba(240,192,64,0.2); }
+.amount-btn.selected {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  color: var(--red-deep); border-color: var(--red);
+  transform: scale(1.05);
+}
+.send-btn {
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: var(--gold-bright); border: 2px solid var(--gold);
+  border-radius: 16px; font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 1.3rem; cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(122,0,0,0.3); margin-top: 12px;
+}
+.send-btn:hover { transform: translateY(-2px); }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Red envelope */
+.envelope-area {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 40px 20px; min-height: 300px;
+}
+
+.envelope {
+  width: 200px; height: 260px;
+  background: linear-gradient(160deg, #E53935 0%, #B71C1C 100%);
+  border-radius: 20px; position: relative;
+  box-shadow: 0 12px 50px rgba(0,0,0,0.5), 0 0 80px rgba(196,30,30,0.2);
+  cursor: pointer; transition: all 0.3s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.envelope:hover { transform: scale(1.05); }
+.envelope:active { transform: scale(0.95); }
+.envelope.disabled { cursor: not-allowed; opacity: 0.6; }
+.envelope.disabled:hover { transform: none; }
+
+.envelope-flap {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(160deg, #C62828 0%, #8E0000 100%);
+  border-radius: 20px 20px 0 0;
+  clip-path: polygon(0 0, 100% 0, 100% 30%, 50% 100%, 0 30%);
+}
+.envelope-seal {
+  width: 60px; height: 60px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+  border-radius: 50%; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+.envelope-text {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 1.5rem; color: var(--gold);
+  margin-top: 12px; z-index: 1;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.envelope-status {
+  text-align: center; margin-top: 20px;
+  font-size: 1rem; color: var(--gold);
+  font-weight: 700;
+}
+
+/* Countdown overlay */
+.countdown-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(82,0,0,0.92); backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column;
+}
+.countdown-overlay.active { display: flex; }
+.countdown-number {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 10rem; color: var(--gold);
+  text-shadow: 0 0 60px rgba(240,192,64,0.5);
+  animation: countPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes countPop { from { transform: scale(2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.countdown-text {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 1.5rem; color: var(--cream); margin-top: 10px;
+}
+
+/* Result overlay */
+.result-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(82,0,0,0.92); backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; padding: 20px;
+}
+.result-overlay.active { display: flex; }
+.result-title {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 2rem; color: var(--gold); margin-bottom: 20px;
+  animation: bounceIn 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes bounceIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+
+.result-list {
+  width: 100%; max-width: 380px;
+}
+.result-item {
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(240,192,64,0.2);
+  border-radius: 16px; padding: 14px 18px;
+  margin-bottom: 10px; display: flex;
+  align-items: center; justify-content: space-between;
+  animation: slideIn 0.4s ease-out both;
+}
+@keyframes slideIn { from { opacity:0; transform: translateX(-20px); } to { opacity:1; transform: translateX(0); } }
+.result-item.best {
+  background: rgba(240,192,64,0.15);
+  border-color: var(--gold);
+}
+.r-name { font-weight: 700; color: var(--cream); font-size: 1rem; }
+.r-label { font-size: 0.7rem; color: var(--gold); }
+.r-amount {
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 1.4rem; color: var(--gold);
+}
+.r-badge {
+  background: var(--gold); color: var(--red-deep);
+  padding: 2px 10px; border-radius: 12px;
+  font-size: 0.7rem; font-weight: 900; margin-left: 8px;
+}
+.result-close-btn {
+  margin-top: 20px; padding: 14px 40px;
+  background: var(--gold); color: var(--red-deep);
+  border: none; border-radius: 30px;
+  font-family: 'Noto Sans TC', sans-serif; font-size: 1rem;
+  font-weight: 700; cursor: pointer;
+}
+
+/* History */
+.history-section {
+  background: rgba(0,0,0,0.3); border: 1.5px solid rgba(240,192,64,0.2);
+  border-radius: 16px; padding: 14px; margin-top: 16px;
+  backdrop-filter: blur(8px);
+}
+.history-title {
+  font-size: 0.72rem; color: var(--gold-dim); font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 8px; text-align: center;
+}
+.history-list { max-height: 200px; overflow-y: auto; }
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.3); border-radius: 4px; }
+.history-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; background: rgba(255,255,255,0.04);
+  border-radius: 10px; margin-bottom: 4px; font-size: 0.82rem;
+}
+.h-round { color: var(--gold-dim); font-weight: 700; }
+.h-info { color: var(--cream); flex: 1; margin-left: 10px; }
+.h-best { color: var(--gold); font-weight: 700; }
+
+/* Waiting message */
+.waiting-message {
+  text-align: center; padding: 40px 20px;
+  font-size: 1.1rem; color: var(--gold-dim);
+}
+.waiting-emoji { font-size: 4rem; margin-bottom: 16px; animation: bounce 2s ease-in-out infinite; }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+/* Spark */
+.spark { position: fixed; width: 5px; height: 5px; border-radius: 50%; pointer-events: none; z-index: 201; }
+
+/* Toast */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+  background: var(--gold); color: var(--red-deep);
+  padding: 12px 24px; border-radius: 30px; font-weight: 700; font-size: 0.9rem;
+  z-index: 300; opacity: 0; transition: all 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (min-width: 600px) {
+  #gameScreen { max-width: 550px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+<div class="particles" id="particles"></div>
+
+<!-- LOGIN -->
+<div class="screen active" id="loginScreen">
+  <div class="login-card">
+    <div class="login-header">🧧</div>
+    <div class="login-title">盧氏集團搶紅包</div>
+    <div class="login-sub">手氣最佳是誰？搶到就是你的！</div>
+
+    <div id="createPanel">
+      <div class="input-group">
+        <label>👤 主持人名字</label>
+        <input type="text" id="hostNameInput" placeholder="例：爸爸" autocomplete="off">
+      </div>
+      <button class="login-btn" onclick="createRoom()">🧧 建立房間</button>
+      <button class="login-btn secondary" onclick="showJoinPanel()">🚪 加入房間</button>
+    </div>
+
+    <div id="joinPanel" style="display:none;">
+      <div class="input-group">
+        <label>🎯 房間碼</label>
+        <input type="text" id="roomCodeInput" placeholder="輸入 4 位數房間碼" maxlength="4" inputmode="numeric" pattern="[0-9]*">
+      </div>
+      <div class="input-group">
+        <label>👤 你的名字</label>
+        <input type="text" id="playerNameInput" placeholder="例：媽媽" autocomplete="off">
+      </div>
+      <button class="login-btn" onclick="joinRoom()">🚀 加入</button>
+      <button class="login-btn secondary" onclick="showCreatePanel()">← 返回</button>
+    </div>
+
+    <div id="waitingPanel" style="display:none;">
+      <div class="room-code-display">
+        <div class="label">房間碼</div>
+        <div class="code" id="displayRoomCode"></div>
+      </div>
+      <div style="text-align:center; font-size:0.85rem; color: var(--red-dark); margin: 15px 0;">
+        等待玩家加入...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="gameScreen">
+  <div class="top-bar">
+    <div>
+      <div class="top-title">🧧 搶紅包</div>
+      <div class="top-info">房間: <span id="roomCodeDisplay"></span></div>
+    </div>
+    <button class="btn-sm" onclick="backToLogin()">離開</button>
+  </div>
+
+  <!-- Players -->
+  <div class="player-section">
+    <div class="player-section-title">🎊 玩家</div>
+    <div class="player-chips" id="playerChips"></div>
+  </div>
+
+  <!-- Host panel: send envelope -->
+  <div class="host-panel" id="hostPanel" style="display:none;">
+    <div class="host-panel-title">🧧 發紅包</div>
+    <div class="amount-presets" id="amountPresets"></div>
+    <div class="input-group" style="margin-top:8px;">
+      <label>💰 自訂金額</label>
+      <input type="number" id="customAmount" placeholder="輸入金額" min="1" inputmode="numeric">
+    </div>
+    <button class="send-btn" id="sendBtn" onclick="sendEnvelope()">🧧 發紅包！</button>
+  </div>
+
+  <!-- Player view: grab envelope -->
+  <div class="envelope-area" id="envelopeArea">
+    <div class="waiting-message" id="waitingMessage">
+      <div class="waiting-emoji">🧧</div>
+      等待主持人發紅包...
+    </div>
+
+    <div id="envelopeContainer" style="display:none;">
+      <div class="envelope" id="envelope" onclick="grabEnvelope()">
+        <div class="envelope-flap"></div>
+        <div class="envelope-seal">🧧</div>
+        <div class="envelope-text">恭喜發財</div>
+      </div>
+      <div class="envelope-status" id="envelopeStatus"></div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-section" id="historySection" style="display:none;">
+    <div class="history-title">📜 紅包紀錄</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<!-- Countdown overlay -->
+<div class="countdown-overlay" id="countdownOverlay">
+  <div class="countdown-number" id="countdownNumber">3</div>
+  <div class="countdown-text">準備搶紅包！</div>
+</div>
+
+<!-- Result overlay -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-title" id="resultTitle">🧧 紅包結果</div>
+  <div class="result-list" id="resultList"></div>
+  <button class="result-close-btn" onclick="closeResult()">繼續</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =========================================================
+// FIREBASE CONFIG
+// =========================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBY7jEge0qqyJTox8gDcQcBgMCw2WyQgy8",
+  authDomain: "cny-bingo.firebaseapp.com",
+  databaseURL: "https://cny-bingo-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "cny-bingo",
+  storageBucket: "cny-bingo.firebasestorage.app",
+  messagingSenderId: "483196851206",
+  appId: "1:483196851206:web:891fad23ced5450c939f87"
+};
+
+let db = null;
+let currentRoomRef = null;
+let currentRoomCode = null;
+let isHost = false;
+let myName = '';
+let fromLobby = false;
+let lobbyParams = null;
+
+let currentRound = null; // current envelope round data
+let hasGrabbed = false;
+let roundHistory = [];
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  console.log('🔥 Firebase initialized');
+} catch (e) {
+  console.error('Firebase error:', e);
+}
+
+// =========================================================
+// UI HELPERS
+// =========================================================
+function generateRoomCode() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function showJoinPanel() {
+  document.getElementById('createPanel').style.display = 'none';
+  document.getElementById('joinPanel').style.display = 'block';
+}
+
+function showCreatePanel() {
+  document.getElementById('joinPanel').style.display = 'none';
+  document.getElementById('createPanel').style.display = 'block';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// =========================================================
+// ROOM MANAGEMENT
+// =========================================================
+async function createRoom() {
+  const name = document.getElementById('hostNameInput').value.trim();
+  if (!name) { showToast('請輸入你的名字'); return; }
+
+  currentRoomCode = generateRoomCode();
+  currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
+  isHost = true;
+  myName = name;
+
+  await currentRoomRef.set({
+    host: name,
+    players: { [name]: { name, joinedAt: Date.now() } },
+    currentEnvelope: null,
+    roundCount: 0,
+    createdAt: Date.now()
+  });
+
+  listenToRoom();
+  startGameView();
+  showToast('房間已建立！');
+}
+
+async function joinRoom() {
+  const code = document.getElementById('roomCodeInput').value.trim();
+  const name = document.getElementById('playerNameInput').value.trim();
+
+  if (!code || code.length !== 4) { showToast('請輸入 4 位數房間碼'); return; }
+  if (!name) { showToast('請輸入你的名字'); return; }
+
+  currentRoomCode = code;
+  currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
+  isHost = false;
+  myName = name;
+
+  const snapshot = await currentRoomRef.once('value');
+  if (!snapshot.exists()) { showToast('房間不存在'); return; }
+
+  const data = snapshot.val();
+  if (data.players && data.players[name]) { showToast('名字已被使用'); return; }
+
+  await currentRoomRef.child('players').child(name).set({ name, joinedAt: Date.now() });
+
+  listenToRoom();
+  startGameView();
+  showToast('已加入房間！');
+}
+
+function startGameView() {
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('gameScreen').classList.add('active');
+  document.getElementById('roomCodeDisplay').textContent = currentRoomCode;
+
+  if (isHost) {
+    document.getElementById('hostPanel').style.display = 'block';
+    initAmountPresets();
+  }
+}
+
+function initAmountPresets() {
+  const presets = document.getElementById('amountPresets');
+  const amounts = [100, 200, 500, 888];
+  presets.innerHTML = amounts.map(amt =>
+    `<button class="amount-btn" onclick="selectAmount(${amt}, this)">${amt}</button>`
+  ).join('');
+}
+
+let selectedAmount = null;
+
+function selectAmount(amt, el) {
+  selectedAmount = amt;
+  document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('customAmount').value = '';
+}
+
+// =========================================================
+// SEND ENVELOPE
+// =========================================================
+async function sendEnvelope() {
+  const custom = parseInt(document.getElementById('customAmount').value);
+  const amount = custom > 0 ? custom : selectedAmount;
+
+  if (!amount || amount <= 0) { showToast('請選擇或輸入金額'); return; }
+
+  // Get current players (excluding host)
+  const snapshot = await currentRoomRef.child('players').once('value');
+  const players = snapshot.val() || {};
+  const playerNames = Object.keys(players).filter(n => n !== myName);
+
+  if (playerNames.length === 0) { showToast('還沒有玩家加入'); return; }
+
+  // Split amount randomly among players
+  const shares = splitAmount(amount, playerNames.length);
+
+  // Shuffle shares
+  for (let i = shares.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shares[i], shares[j]] = [shares[j], shares[i]];
+  }
+
+  // Create envelope data (shares are pre-assigned in grab order)
+  const roundNum = (await currentRoomRef.child('roundCount').once('value')).val() || 0;
+
+  const envelope = {
+    amount,
+    shares, // array of amounts, assigned to grabbers in order
+    totalPlayers: playerNames.length,
+    grabs: {}, // { playerName: { amount, order, timestamp } }
+    grabCount: 0,
+    state: 'countdown', // countdown -> active -> done
+    createdAt: Date.now()
+  };
+
+  await currentRoomRef.update({
+    currentEnvelope: envelope,
+    roundCount: roundNum + 1
+  });
+
+  document.getElementById('sendBtn').disabled = true;
+
+  // Countdown handled by listener
+}
+
+function splitAmount(total, count) {
+  // Random split that sums to total
+  // Use "cutting" method for natural-feeling distribution
+  if (count === 1) return [total];
+
+  const shares = [];
+  let remaining = total;
+
+  for (let i = 0; i < count - 1; i++) {
+    // Each person gets at least 1
+    const maxShare = remaining - (count - i - 1);
+    const minShare = 1;
+    // Random amount biased toward middle
+    const share = Math.max(minShare, Math.min(maxShare,
+      Math.floor(remaining * (0.1 + Math.random() * 0.5))
+    ));
+    shares.push(share);
+    remaining -= share;
+  }
+  shares.push(remaining); // last person gets the rest
+
+  return shares;
+}
+
+// =========================================================
+// LISTEN TO ROOM
+// =========================================================
+function listenToRoom() {
+  currentRoomRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    // Update player list
+    const players = data.players || {};
+    const playerNames = Object.keys(players);
+    const chips = document.getElementById('playerChips');
+    chips.innerHTML = playerNames.map(name => {
+      const cls = name === data.host ? 'p-chip host' : 'p-chip';
+      return `<div class="${cls}">${name === data.host ? '👑 ' : ''}${name}</div>`;
+    }).join('');
+
+    // Handle envelope state
+    const env = data.currentEnvelope;
+    if (!env) {
+      // No active envelope
+      showWaitingState();
+      return;
+    }
+
+    if (env.state === 'countdown') {
+      showCountdown();
+    } else if (env.state === 'active') {
+      showEnvelope(env);
+    } else if (env.state === 'done') {
+      showEnvelopeResult(env, data.roundCount);
+    }
+  });
+}
+
+function showWaitingState() {
+  hasGrabbed = false;
+  document.getElementById('waitingMessage').style.display = 'block';
+  document.getElementById('envelopeContainer').style.display = 'none';
+  document.getElementById('countdownOverlay').classList.remove('active');
+  document.getElementById('resultOverlay').classList.remove('active');
+
+  if (isHost) {
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+// =========================================================
+// COUNTDOWN
+// =========================================================
+let countdownInterval = null;
+
+function showCountdown() {
+  hasGrabbed = false;
+  document.getElementById('waitingMessage').style.display = 'none';
+  document.getElementById('envelopeContainer').style.display = 'none';
+
+  const overlay = document.getElementById('countdownOverlay');
+  const numEl = document.getElementById('countdownNumber');
+
+  if (overlay.classList.contains('active')) return; // Already showing
+  overlay.classList.add('active');
+
+  let count = 3;
+  numEl.textContent = count;
+
+  countdownInterval = setInterval(async () => {
+    count--;
+    if (count > 0) {
+      numEl.textContent = count;
+      // Re-trigger animation
+      numEl.style.animation = 'none';
+      numEl.offsetHeight; // force reflow
+      numEl.style.animation = '';
+    } else {
+      clearInterval(countdownInterval);
+      overlay.classList.remove('active');
+
+      // Host transitions to active state
+      if (isHost) {
+        await currentRoomRef.child('currentEnvelope/state').set('active');
+      }
+    }
+  }, 1000);
+}
+
+// =========================================================
+// GRAB ENVELOPE
+// =========================================================
+function showEnvelope(env) {
+  document.getElementById('waitingMessage').style.display = 'none';
+  document.getElementById('envelopeContainer').style.display = 'block';
+  document.getElementById('countdownOverlay').classList.remove('active');
+
+  const envelope = document.getElementById('envelope');
+  const status = document.getElementById('envelopeStatus');
+
+  const grabbed = env.grabs || {};
+  const grabCount = Object.keys(grabbed).length;
+
+  if (grabbed[myName]) {
+    // Already grabbed
+    hasGrabbed = true;
+    envelope.classList.add('disabled');
+    status.textContent = `你搶到了 $${grabbed[myName].amount}！（${grabCount}/${env.totalPlayers} 人已搶）`;
+  } else if (isHost) {
+    // Host doesn't grab
+    envelope.classList.add('disabled');
+    status.textContent = `${grabCount}/${env.totalPlayers} 人已搶`;
+  } else if (grabCount >= env.totalPlayers) {
+    envelope.classList.add('disabled');
+    status.textContent = '紅包已搶完！';
+  } else {
+    envelope.classList.remove('disabled');
+    status.textContent = `快搶！（${grabCount}/${env.totalPlayers} 人已搶）`;
+  }
+}
+
+async function grabEnvelope() {
+  if (hasGrabbed || isHost) return;
+
+  const envSnapshot = await currentRoomRef.child('currentEnvelope').once('value');
+  const env = envSnapshot.val();
+  if (!env || env.state !== 'active') return;
+
+  const grabbed = env.grabs || {};
+  const grabCount = Object.keys(grabbed).length;
+
+  if (grabbed[myName]) { showToast('你已經搶過了'); return; }
+  if (grabCount >= env.totalPlayers) { showToast('紅包已搶完'); return; }
+
+  // Assign the next share
+  const myAmount = env.shares[grabCount];
+  hasGrabbed = true;
+
+  await currentRoomRef.child('currentEnvelope/grabs').child(myName).set({
+    amount: myAmount,
+    order: grabCount + 1,
+    timestamp: Date.now()
+  });
+
+  showToast(`🧧 搶到 $${myAmount}！`);
+
+  // Check if all grabbed
+  if (grabCount + 1 >= env.totalPlayers) {
+    // Last person - transition to done
+    await currentRoomRef.child('currentEnvelope/state').set('done');
+  }
+}
+
+// =========================================================
+// RESULT
+// =========================================================
+let lastShownRound = 0;
+
+function showEnvelopeResult(env, roundNum) {
+  document.getElementById('envelopeContainer').style.display = 'none';
+  document.getElementById('waitingMessage').style.display = 'none';
+
+  if (lastShownRound >= roundNum) return; // Already shown
+  lastShownRound = roundNum;
+
+  const grabs = env.grabs || {};
+  const entries = Object.entries(grabs).map(([name, data]) => ({
+    name, amount: data.amount, order: data.order
+  }));
+
+  // Sort by amount descending
+  entries.sort((a, b) => b.amount - a.amount);
+
+  const bestAmount = entries.length > 0 ? entries[0].amount : 0;
+
+  const overlay = document.getElementById('resultOverlay');
+  const title = document.getElementById('resultTitle');
+  const list = document.getElementById('resultList');
+
+  title.textContent = `🧧 紅包 $${env.amount} 結果`;
+
+  list.innerHTML = entries.map((e, i) => {
+    const isBest = e.amount === bestAmount;
+    const delay = i * 0.15;
+    return `<div class="result-item${isBest ? ' best' : ''}" style="animation-delay:${delay}s">
+      <div>
+        <div class="r-name">${e.name}${isBest ? '<span class="r-badge">手氣最佳</span>' : ''}</div>
+        <div class="r-label">第 ${e.order} 個搶到</div>
+      </div>
+      <div class="r-amount">$${e.amount}</div>
+    </div>`;
+  }).join('');
+
+  overlay.classList.add('active');
+  launchFireworks();
+
+  // Add to history
+  addToHistory(roundNum, env.amount, entries);
+
+  // Reset envelope after showing
+  if (isHost) {
+    setTimeout(() => {
+      currentRoomRef.child('currentEnvelope').set(null);
+    }, 1000);
+  }
+}
+
+function closeResult() {
+  document.getElementById('resultOverlay').classList.remove('active');
+}
+
+function addToHistory(round, total, entries) {
+  const best = entries[0];
+  const section = document.getElementById('historySection');
+  section.style.display = 'block';
+
+  const list = document.getElementById('historyList');
+  const item = document.createElement('div');
+  item.className = 'history-item';
+  item.innerHTML = `
+    <span class="h-round">#${round}</span>
+    <span class="h-info">$${total} · ${entries.length}人搶</span>
+    <span class="h-best">👑 ${best.name} $${best.amount}</span>
+  `;
+  list.insertBefore(item, list.firstChild);
+}
+
+// =========================================================
+// FIREWORKS
+// =========================================================
+function launchFireworks() {
+  const colors = ['#FFD700','#FF5F52','#FFF176','#FF6F00','#4CAF50','#E91E63'];
+  for (let b = 0; b < 4; b++) {
+    setTimeout(() => {
+      const cx = Math.random() * window.innerWidth;
+      const cy = Math.random() * window.innerHeight * 0.5;
+      for (let i = 0; i < 20; i++) {
+        const s = document.createElement('div');
+        s.className = 'spark';
+        s.style.left = cx+'px'; s.style.top = cy+'px';
+        s.style.background = colors[Math.floor(Math.random()*colors.length)];
+        const a = (Math.PI*2/20)*i, d = 40+Math.random()*80;
+        s.style.transition = `all ${0.4+Math.random()*0.4}s ease-out`;
+        document.body.appendChild(s);
+        requestAnimationFrame(() => { s.style.transform = `translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`; s.style.opacity = '0'; });
+        setTimeout(() => s.remove(), 1200);
+      }
+    }, b * 200);
+  }
+}
+
+// =========================================================
+// BACK / LEAVE
+// =========================================================
+function backToLogin() {
+  if (currentRoomRef) {
+    if (isHost) {
+      currentRoomRef.remove();
+    } else {
+      currentRoomRef.child('players').child(myName).remove();
+    }
+    currentRoomRef.off();
+  }
+
+  if (fromLobby && lobbyParams) {
+    const params = new URLSearchParams({
+      lobby: lobbyParams.lobby,
+      name: lobbyParams.name,
+      host: lobbyParams.host ? '1' : '0'
+    });
+    window.location.href = 'index.html?' + params.toString();
+    return;
+  }
+
+  location.reload();
+}
+
+// =========================================================
+// LOBBY INTEGRATION
+// =========================================================
+async function initFromLobby(code, name, host) {
+  currentRoomCode = code;
+  currentRoomRef = db.ref('hongbaoRooms/' + code);
+  isHost = host;
+  myName = name;
+
+  if (host) {
+    await currentRoomRef.set({
+      host: name,
+      players: { [name]: { name, joinedAt: Date.now() } },
+      currentEnvelope: null,
+      roundCount: 0,
+      createdAt: Date.now()
+    });
+  } else {
+    let attempts = 0;
+    while (attempts < 20) {
+      const snapshot = await currentRoomRef.once('value');
+      if (snapshot.exists()) break;
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+    await currentRoomRef.child('players').child(name).set({ name, joinedAt: Date.now() });
+  }
+
+  listenToRoom();
+  startGameView();
+}
+
+(function checkLobbyParams() {
+  const params = new URLSearchParams(window.location.search);
+  const lobby = params.get('lobby');
+  const name = params.get('name');
+  const host = params.get('host');
+
+  if (lobby && name && db) {
+    fromLobby = true;
+    lobbyParams = { lobby, name, host: host === '1' };
+    window.history.replaceState({}, '', window.location.pathname);
+    initFromLobby(lobby, name, host === '1');
+  }
+})();
+
+// =========================================================
+// PARTICLES
+// =========================================================
+(function() {
+  const c = document.getElementById('particles');
+  const icons = ['🧧','✨','💰','🎊','🏮','💫'];
+  for (let i = 0; i < 10; i++) {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    el.textContent = icons[Math.floor(Math.random()*icons.length)];
+    el.style.left = Math.random()*100+'%';
+    el.style.fontSize = (1+Math.random()*1.5)+'rem';
+    el.style.animationDuration = (18+Math.random()*20)+'s';
+    el.style.animationDelay = (-Math.random()*35)+'s';
+    c.appendChild(el);
+  }
+})();
+</script>
+
+</body>
+</html>
