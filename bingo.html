@@ -427,7 +427,7 @@ body {
       <div id="joinRoomPanel" style="display:none;">
         <div class="input-group">
           <label>🎯 房間碼</label>
-          <input type="text" id="roomCodeInput" placeholder="輸入 6 位數房間碼" autocomplete="off" maxlength="6" style="text-transform:uppercase;">
+          <input type="text" id="roomCodeInput" placeholder="輸入 4 位數房間碼" autocomplete="off" maxlength="4" inputmode="numeric" pattern="[0-9]*">
         </div>
         <div class="input-group">
           <label>👤 你的名字</label>
@@ -581,6 +581,8 @@ let players = []; // [{name, card:[{e,l,free?,marked,winLine}], lines}]
 let calledItems = []; // [{e,l,round}]
 let currentView = 0; // which player tab is active
 let winShownFor = new Set();
+let fromLobby = false;
+let lobbyParams = null;
 
 // =========================================================
 // SEEDED SHUFFLE
@@ -643,12 +645,7 @@ function showCreatePanel() {
 // ROOM MANAGEMENT
 // =========================================================
 function generateRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 async function createRoom() {
@@ -700,8 +697,8 @@ async function joinRoom() {
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   const playerName = document.getElementById('playerNameInput').value.trim();
 
-  if (!roomCode || roomCode.length !== 6) {
-    showToast('請輸入 6 位數房間碼');
+  if (!roomCode || roomCode.length !== 4) {
+    showToast('請輸入 4 位數房間碼');
     return;
   }
 
@@ -926,6 +923,17 @@ function backToLogin() {
   players = [];
   calledItems = [];
   winShownFor = new Set();
+
+  // If launched from lobby, navigate back to lobby
+  if (fromLobby && lobbyParams) {
+    const params = new URLSearchParams({
+      lobby: lobbyParams.lobby,
+      name: lobbyParams.name,
+      host: lobbyParams.host ? '1' : '0'
+    });
+    window.location.href = 'index.html?' + params.toString();
+    return;
+  }
 
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('loginScreen').classList.add('active');
@@ -1281,9 +1289,95 @@ function showToast(msg) {
   }
 })();
 
+// =========================================================
+// LOBBY INTEGRATION
+// =========================================================
+async function initFromLobby(code, name, host) {
+  gameMode = 'online';
+  myPlayerName = name;
+  isHost = host;
+  currentRoomCode = code;
+  currentRoomRef = db.ref('rooms/' + code);
+
+  if (host) {
+    // Host creates the bingo room
+    await currentRoomRef.set({
+      host: name,
+      players: { [name]: { name, joinedAt: Date.now(), lines: 0 } },
+      calledItems: [],
+      turnOrder: [name],
+      currentTurn: name,
+      resetCounter: 0,
+      createdAt: Date.now(),
+      gameStarted: true
+    });
+
+    players = [{ name, card: makeCard(name), lines: 0 }];
+    currentTurn = name;
+    turnOrder = [name];
+  } else {
+    // Non-host waits for room to exist, then joins
+    let attempts = 0;
+    let roomData = null;
+    while (attempts < 20) {
+      const snapshot = await currentRoomRef.once('value');
+      if (snapshot.exists()) {
+        roomData = snapshot.val();
+        break;
+      }
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+
+    if (!roomData) {
+      showToast('無法加入遊戲房間');
+      if (lobbyParams) {
+        const params = new URLSearchParams({
+          lobby: lobbyParams.lobby,
+          name: lobbyParams.name,
+          host: '0'
+        });
+        window.location.href = 'index.html?' + params.toString();
+      }
+      return;
+    }
+
+    // Add player to room
+    await currentRoomRef.child('players').child(name).set({
+      name, joinedAt: Date.now(), lines: 0
+    });
+
+    // Update turn order
+    const newTurnOrder = [...(roomData.turnOrder || []), name];
+    await currentRoomRef.child('turnOrder').set(newTurnOrder);
+
+    players = [{ name, card: makeCard(name), lines: 0 }];
+    currentView = 0;
+  }
+
+  listenToRoom();
+  startOnlineGame();
+}
+
+// Check for lobby URL params on load
+(function checkLobbyParams() {
+  const params = new URLSearchParams(window.location.search);
+  const lobby = params.get('lobby');
+  const name = params.get('name');
+  const host = params.get('host');
+
+  if (lobby && name && firebaseEnabled) {
+    fromLobby = true;
+    lobbyParams = { lobby, name, host: host === '1' };
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    initFromLobby(lobby, name, host === '1');
+  }
+})();
+
 // Enter to start
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('loginScreen').classList.contains('active')) startGame();
+  if (e.key === 'Enter' && document.getElementById('loginScreen').classList.contains('active')) startLocalGame();
 });
 </script>
 

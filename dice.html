@@ -758,7 +758,7 @@ body {
     <div id="joinPanel" style="display:none;">
       <div class="input-group">
         <label>🎯 房間碼</label>
-        <input type="text" id="roomCodeInput" placeholder="輸入 6 位數驗證碼" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+        <input type="text" id="roomCodeInput" placeholder="輸入 4 位數房間碼" maxlength="4" inputmode="numeric" pattern="[0-9]*">
       </div>
       <div class="input-group">
         <label>👤 你的名字</label>
@@ -905,6 +905,8 @@ let currentRoomCode = null;
 let isBanker = false;
 let myName = '';
 let gameState = 'waiting'; // waiting, betting, rolling, result
+let fromLobby = false;
+let lobbyParams = null;
 
 // Initialize Firebase
 try {
@@ -918,7 +920,7 @@ try {
 
 // Generate room code
 function generateRoomCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 // Create room
@@ -964,8 +966,8 @@ async function joinRoom() {
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   const playerName = document.getElementById('playerNameInput').value.trim();
 
-  if (!roomCode || roomCode.length !== 6) {
-    showToast('請輸入 6 位數驗證碼');
+  if (!roomCode || roomCode.length !== 4) {
+    showToast('請輸入 4 位數房間碼');
     return;
   }
 
@@ -1595,6 +1597,17 @@ function backToLogin() {
     currentRoomRef.off();
   }
 
+  // If launched from lobby, navigate back to lobby
+  if (fromLobby && lobbyParams) {
+    const params = new URLSearchParams({
+      lobby: lobbyParams.lobby,
+      name: lobbyParams.name,
+      host: lobbyParams.host ? '1' : '0'
+    });
+    window.location.href = 'index.html?' + params.toString();
+    return;
+  }
+
   location.reload();
 }
 
@@ -1604,6 +1617,62 @@ function showToast(msg) {
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+// =========================================================
+// LOBBY INTEGRATION
+// =========================================================
+async function initFromLobby(code, name, host) {
+  currentRoomCode = code;
+  currentRoomRef = db.ref('diceRooms/' + code);
+  isBanker = host;
+  myName = name;
+
+  if (host) {
+    // Banker creates the dice room
+    await currentRoomRef.set({
+      banker: name,
+      players: {},
+      bets: {},
+      gameState: 'waiting',
+      timer: 120,
+      diceResult: null,
+      createdAt: Date.now()
+    });
+  } else {
+    // Non-host waits for room to exist, then joins
+    let attempts = 0;
+    while (attempts < 20) {
+      const snapshot = await currentRoomRef.once('value');
+      if (snapshot.exists()) break;
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+
+    // Add player
+    await currentRoomRef.child('players').child(name).set({
+      name, joinedAt: Date.now()
+    });
+  }
+
+  listenToRoom();
+  startGameView();
+}
+
+// Check for lobby URL params on load
+(function checkLobbyParams() {
+  const params = new URLSearchParams(window.location.search);
+  const lobby = params.get('lobby');
+  const name = params.get('name');
+  const host = params.get('host');
+
+  if (lobby && name && db) {
+    fromLobby = true;
+    lobbyParams = { lobby, name, host: host === '1' };
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    initFromLobby(lobby, name, host === '1');
+  }
+})();
 </script>
 
 </body>
