@@ -184,14 +184,10 @@ body {
 }
 
 @keyframes celebrationZoom {
-  from {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0% { opacity: 0; transform: scale(0.2) rotate(-10deg); }
+  50% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+  70% { transform: scale(0.95) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
 .celebration-emoji {
@@ -251,12 +247,40 @@ body {
   background: var(--gold);
   animation: confettiFall linear forwards;
 }
+.confetti.circle { border-radius: 50%; }
+.confetti.star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
 
 @keyframes confettiFall {
-  to {
-    transform: translateY(100vh) rotate(360deg);
-    opacity: 0;
-  }
+  0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+  25% { transform: translateY(25vh) rotate(180deg) translateX(30px) scale(1.1); }
+  50% { transform: translateY(50vh) rotate(360deg) translateX(-20px) scale(0.9); }
+  75% { transform: translateY(75vh) rotate(540deg) translateX(10px) scale(1); opacity: 0.7; }
+  100% { transform: translateY(105vh) rotate(720deg) scale(0.5); opacity: 0; }
+}
+
+/* Gold coin animation */
+.gold-coin {
+  position: fixed; z-index: 1001;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFE082, var(--gold-bright), var(--gold-dim));
+  box-shadow: 0 0 10px rgba(255,215,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.2);
+  animation: coinFall linear forwards;
+  pointer-events: none;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.gold-coin::after { content: '$'; color: var(--red-dark); font-weight: 900; font-size: 14px; }
+
+@keyframes coinFall {
+  0% { transform: translateY(-50px) rotateY(0deg) scale(0.5); opacity: 0; }
+  10% { opacity: 1; transform: translateY(0) rotateY(90deg) scale(1); }
+  100% { transform: translateY(110vh) rotateY(1080deg) scale(0.3); opacity: 0; }
+}
+
+/* Canvas for firework effects */
+#diceFireworkCanvas {
+  position: fixed; inset: 0; z-index: 998; pointer-events: none;
 }
 
 .dice-animation-content {
@@ -293,14 +317,10 @@ body {
 }
 
 @keyframes diceAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.5) rotate(-180deg);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
+  0% { opacity: 0; transform: scale(0.2) rotate(-360deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(10deg); }
+  70% { transform: scale(0.95) rotate(-3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
 .die-big .dot {
@@ -344,9 +364,16 @@ body {
 }
 
 @keyframes shake {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-5deg) translateY(-5px); }
-  75% { transform: rotate(5deg) translateY(-5px); }
+  0%, 100% { transform: rotate(0deg) translate(0); }
+  10% { transform: rotate(-8deg) translate(-6px, -4px); }
+  20% { transform: rotate(8deg) translate(6px, -6px); }
+  30% { transform: rotate(-6deg) translate(-4px, 4px); }
+  40% { transform: rotate(6deg) translate(4px, -8px); }
+  50% { transform: rotate(-10deg) translate(-8px, -2px); }
+  60% { transform: rotate(10deg) translate(8px, -4px); }
+  70% { transform: rotate(-4deg) translate(-6px, 6px); }
+  80% { transform: rotate(6deg) translate(4px, -6px); }
+  90% { transform: rotate(-2deg) translate(-2px, 2px); }
 }
 
 .dice-result {
@@ -431,8 +458,10 @@ body {
 .bet-spot:hover {
   background: rgba(255,255,255,0.2);
   border-color: var(--gold);
-  transform: scale(1.02);
+  transform: scale(1.05) translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }
+.bet-spot:active { transform: scale(0.95); }
 
 .bet-spot.has-my-bet {
   background: rgba(76,175,80,0.2);
@@ -459,8 +488,8 @@ body {
 }
 
 @keyframes winPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(255,215,0,0.3); }
+  50% { transform: scale(1.08); box-shadow: 0 0 30px rgba(255,215,0,0.6), 0 0 60px rgba(255,215,0,0.2); }
 }
 
 .bet-number {
@@ -559,9 +588,11 @@ body {
   background: linear-gradient(135deg, var(--gold), var(--gold-dim));
   color: var(--red-deep);
   border-color: var(--red);
-  transform: scale(1.1);
-  box-shadow: 0 4px 15px rgba(240,192,64,0.5);
+  transform: scale(1.15);
+  box-shadow: 0 4px 20px rgba(240,192,64,0.6), 0 0 30px rgba(240,192,64,0.2);
+  animation: chipSelect 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
 }
+@keyframes chipSelect { 0%{transform:scale(0.8)} 50%{transform:scale(1.25)} 100%{transform:scale(1.15)} }
 
 .betting-instruction {
   text-align: center;
@@ -1365,17 +1396,29 @@ function showDiceAnimation(finalDice1, finalDice2) {
     if (elapsed >= 3500) {
       clearInterval(animationInterval);
 
+      // Flash effect before reveal
+      container.style.animation = 'none';
+      container.offsetHeight;
+
       // Show final result with emphasis
       container.innerHTML = `
         ${createDie(finalDice1, true)}
         ${createDie(finalDice2, true)}
       `;
       title.textContent = `🎉 開出：${finalDice1} 和 ${finalDice2}`;
+      title.style.fontSize = '2.5rem';
+      title.style.textShadow = '0 0 40px rgba(240,192,64,0.8)';
+
+      // Brief screen flash
+      overlay.style.background = 'rgba(255,215,0,0.15)';
+      setTimeout(() => { overlay.style.background = 'rgba(0,0,0,0.92)'; }, 150);
 
       // Hide overlay after showing result
       setTimeout(() => {
         overlay.classList.remove('active');
-      }, 1500);
+        title.style.fontSize = '2rem';
+        title.style.textShadow = '0 0 20px rgba(240,192,64,0.5)';
+      }, 2000);
     }
   }, interval);
 }
@@ -1399,16 +1442,35 @@ function showResultCelebration(netAmount) {
     text.textContent = '恭喜中獎！';
     amount.textContent = `+$${netAmount}`;
 
-    // Create confetti
-    for (let i = 0; i < 50; i++) {
+    // Create enhanced confetti
+    const shapes = ['', 'circle', 'star'];
+    for (let i = 0; i < 80; i++) {
       const confetti = document.createElement('div');
-      confetti.className = 'confetti';
+      const shape = shapes[Math.floor(Math.random() * shapes.length)];
+      confetti.className = 'confetti' + (shape ? ' ' + shape : '');
       confetti.style.left = Math.random() * 100 + '%';
       confetti.style.top = -10 + 'px';
-      confetti.style.background = ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#95E1D3'][Math.floor(Math.random() * 5)];
-      confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
-      confetti.style.animationDelay = (Math.random() * 0.5) + 's';
+      confetti.style.background = ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#95E1D3', '#FF1744', '#F50057', '#FFD740'][Math.floor(Math.random() * 8)];
+      confetti.style.width = (6 + Math.random() * 10) + 'px';
+      confetti.style.height = (6 + Math.random() * 10) + 'px';
+      confetti.style.animationDuration = (2.5 + Math.random() * 3) + 's';
+      confetti.style.animationDelay = (Math.random() * 1) + 's';
       overlay.appendChild(confetti);
+    }
+
+    // Gold coins rain
+    for (let i = 0; i < 15; i++) {
+      setTimeout(() => {
+        const coin = document.createElement('div');
+        coin.className = 'gold-coin';
+        coin.style.left = (10 + Math.random() * 80) + '%';
+        coin.style.top = '-40px';
+        coin.style.animationDuration = (2 + Math.random() * 2) + 's';
+        coin.style.width = (20 + Math.random() * 15) + 'px';
+        coin.style.height = coin.style.width;
+        document.body.appendChild(coin);
+        setTimeout(() => coin.remove(), 4500);
+      }, Math.random() * 1500);
     }
   } else if (netAmount < 0) {
     // LOSE
