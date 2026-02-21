@@ -183,8 +183,9 @@ body {
   font-size: 1.3rem; cursor: pointer; transition: all 0.2s;
   box-shadow: 0 4px 20px rgba(122,0,0,0.3); margin-top: 12px;
 }
-.send-btn:hover { transform: translateY(-2px); }
-.send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.send-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 30px rgba(122,0,0,0.5); }
+.send-btn:active { transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; animation: none; }
 
 /* Red envelope */
 .envelope-area {
@@ -197,13 +198,30 @@ body {
   background: linear-gradient(160deg, #E53935 0%, #B71C1C 100%);
   border-radius: 20px; position: relative;
   box-shadow: 0 12px 50px rgba(0,0,0,0.5), 0 0 80px rgba(196,30,30,0.2);
-  cursor: pointer; transition: all 0.3s;
+  cursor: pointer; transition: all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
+  animation: envelopeEntrance 0.8s cubic-bezier(0.175,0.885,0.32,1.275), envelopeFloat 3s ease-in-out infinite;
+  transform-style: preserve-3d;
+  perspective: 600px;
 }
-.envelope:hover { transform: scale(1.05); }
-.envelope:active { transform: scale(0.95); }
-.envelope.disabled { cursor: not-allowed; opacity: 0.6; }
-.envelope.disabled:hover { transform: none; }
+@keyframes envelopeEntrance { from { opacity:0; transform: scale(0.3) rotateY(-30deg); } to { opacity:1; transform: scale(1) rotateY(0); } }
+@keyframes envelopeFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+.envelope:hover {
+  transform: scale(1.08) rotateY(-5deg) translateY(-5px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 100px rgba(196,30,30,0.3);
+}
+.envelope:active { transform: scale(0.9); animation: none; }
+.envelope.grabbed {
+  animation: envelopeOpen 0.8s ease-out forwards !important;
+}
+@keyframes envelopeOpen {
+  0% { transform: scale(1) rotateX(0); }
+  30% { transform: scale(1.15) rotateX(-15deg); }
+  60% { transform: scale(1.2) rotateX(-30deg); opacity: 0.8; }
+  100% { transform: scale(0.8) rotateX(-60deg); opacity: 0; }
+}
+.envelope.disabled { cursor: not-allowed; opacity: 0.6; animation: none; }
+.envelope.disabled:hover { transform: none; box-shadow: 0 12px 50px rgba(0,0,0,0.5); }
 
 .envelope-flap {
   position: absolute; top: 0; left: 0; right: 0;
@@ -217,7 +235,12 @@ body {
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
   border-radius: 50%; z-index: 1;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  font-size: 1.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 30px rgba(255,215,0,0.3);
+  animation: sealGlow 2s ease-in-out infinite alternate;
+}
+@keyframes sealGlow {
+  from { box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 15px rgba(255,215,0,0.2); }
+  to { box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 40px rgba(255,215,0,0.5), 0 0 80px rgba(255,215,0,0.15); }
 }
 .envelope-text {
   font-family: 'ZCOOL KuaiLe', cursive;
@@ -242,16 +265,26 @@ body {
 .countdown-overlay.active { display: flex; }
 .countdown-number {
   font-family: 'ZCOOL KuaiLe', cursive;
-  font-size: 10rem; color: var(--gold);
-  text-shadow: 0 0 60px rgba(240,192,64,0.5);
-  animation: countPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+  font-size: 12rem; color: var(--gold);
+  text-shadow: 0 0 60px rgba(240,192,64,0.5), 0 0 120px rgba(240,192,64,0.2);
+  animation: countPop 0.8s cubic-bezier(0.175,0.885,0.32,1.275);
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold), var(--gold-dim));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 40px rgba(255,215,0,0.6));
 }
-@keyframes countPop { from { transform: scale(2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes countPop {
+  0% { transform: scale(3) rotate(10deg); opacity: 0; filter: blur(10px) drop-shadow(0 0 40px rgba(255,215,0,0.6)); }
+  50% { transform: scale(0.9) rotate(-2deg); opacity: 1; filter: blur(0) drop-shadow(0 0 40px rgba(255,215,0,0.6)); }
+  70% { transform: scale(1.05) rotate(1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
 .countdown-text {
   font-family: 'ZCOOL KuaiLe', cursive;
-  font-size: 1.5rem; color: var(--cream); margin-top: 10px;
+  font-size: 1.8rem; color: var(--cream); margin-top: 10px;
+  animation: fadeUp 0.5s ease-out;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
-
 /* Result overlay */
 .result-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -262,10 +295,17 @@ body {
 .result-overlay.active { display: flex; }
 .result-title {
   font-family: 'ZCOOL KuaiLe', cursive;
-  font-size: 2rem; color: var(--gold); margin-bottom: 20px;
+  font-size: 2.2rem; margin-bottom: 20px;
   animation: bounceIn 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+  background: linear-gradient(90deg, var(--gold), #FFF8E8, var(--gold-bright), var(--gold));
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: bounceIn 0.6s cubic-bezier(0.175,0.885,0.32,1.275), shimmerResult 2s linear 0.6s infinite;
 }
-@keyframes bounceIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+@keyframes shimmerResult { to { background-position: 200% center; } }
+@keyframes bounceIn { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
 .result-list {
   width: 100%; max-width: 380px;
@@ -278,7 +318,7 @@ body {
   align-items: center; justify-content: space-between;
   animation: slideIn 0.4s ease-out both;
 }
-@keyframes slideIn { from { opacity:0; transform: translateX(-20px); } to { opacity:1; transform: translateX(0); } }
+@keyframes slideIn { from { opacity:0; transform: translateX(-30px) scale(0.9); } to { opacity:1; transform: translateX(0) scale(1); } }
 .result-item.best {
   background: rgba(240,192,64,0.15);
   border-color: var(--gold);
@@ -288,12 +328,17 @@ body {
 .r-amount {
   font-family: 'ZCOOL KuaiLe', cursive;
   font-size: 1.4rem; color: var(--gold);
+  text-shadow: 0 0 10px rgba(255,215,0,0.3);
 }
 .r-badge {
-  background: var(--gold); color: var(--red-deep);
-  padding: 2px 10px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  color: var(--red-deep);
+  padding: 3px 12px; border-radius: 12px;
   font-size: 0.7rem; font-weight: 900; margin-left: 8px;
+  animation: badgePulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(255,215,0,0.3);
 }
+@keyframes badgePulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(255,215,0,0.5); } }
 .result-close-btn {
   margin-top: 20px; padding: 14px 40px;
   background: var(--gold); color: var(--red-deep);
@@ -331,6 +376,42 @@ body {
 }
 .waiting-emoji { font-size: 4rem; margin-bottom: 16px; animation: bounce 2s ease-in-out infinite; }
 @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+/* Gold coin burst */
+.gold-coin-burst {
+  position: fixed; z-index: 202;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFE082, var(--gold-bright), var(--gold-dim));
+  box-shadow: 0 0 10px rgba(255,215,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.2);
+  pointer-events: none;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  animation: coinBurst var(--dur, 1s) ease-out forwards;
+}
+.gold-coin-burst::after { content: '$'; color: var(--red-dark); font-weight: 900; }
+@keyframes coinBurst {
+  0% { transform: translate(0, 0) scale(0) rotateY(0); opacity: 1; }
+  20% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.2) rotateY(180deg); opacity: 1; }
+  100% { transform: translate(calc(var(--tx, 0) * 2), calc(var(--ty, 0) * 2 + 100px)) scale(0.5) rotateY(720deg); opacity: 0; }
+}
+
+/* Amount reveal */
+.amount-reveal {
+  position: fixed; z-index: 203;
+  font-family: 'ZCOOL KuaiLe', cursive;
+  font-size: 3rem; color: var(--gold-bright);
+  text-shadow: 0 0 30px rgba(255,215,0,0.8), 0 4px 15px rgba(0,0,0,0.5);
+  pointer-events: none;
+  animation: amountReveal 2s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+}
+@keyframes amountReveal {
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  30% { transform: scale(1.3) rotate(3deg); opacity: 1; }
+  50% { transform: scale(1) rotate(0); }
+  80% { opacity: 1; }
+  100% { transform: scale(1) translateY(-40px); opacity: 0; }
+}
 
 /* Spark */
 .spark { position: fixed; width: 5px; height: 5px; border-radius: 50%; pointer-events: none; z-index: 201; }
@@ -852,6 +933,27 @@ async function grabEnvelope() {
   const myAmount = env.shares[grabCount];
   hasGrabbed = true;
 
+  // Trigger grab animation
+  const envelopeEl = document.getElementById('envelope');
+  envelopeEl.classList.add('grabbed');
+
+  // Gold coin burst from envelope center
+  const rect = envelopeEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  launchCoinBurst(cx, cy);
+
+  // Show amount reveal
+  setTimeout(() => {
+    const reveal = document.createElement('div');
+    reveal.className = 'amount-reveal';
+    reveal.textContent = `$${myAmount}`;
+    reveal.style.left = (cx - 60) + 'px';
+    reveal.style.top = (cy - 30) + 'px';
+    document.body.appendChild(reveal);
+    setTimeout(() => reveal.remove(), 2200);
+  }, 400);
+
   await currentRoomRef.child('currentEnvelope/grabs').child(myName).set({
     amount: myAmount,
     order: grabCount + 1,
@@ -942,26 +1044,52 @@ function addToHistory(round, total, entries) {
 }
 
 // =========================================================
+// GOLD COIN BURST
+// =========================================================
+function launchCoinBurst(cx, cy) {
+  const count = 12;
+  for (let i = 0; i < count; i++) {
+    const coin = document.createElement('div');
+    coin.className = 'gold-coin-burst';
+    coin.style.left = cx + 'px';
+    coin.style.top = cy + 'px';
+    const angle = (Math.PI * 2 / count) * i;
+    const dist = 60 + Math.random() * 80;
+    coin.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+    coin.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+    coin.style.setProperty('--dur', (0.8 + Math.random() * 0.6) + 's');
+    document.body.appendChild(coin);
+    setTimeout(() => coin.remove(), 2000);
+  }
+}
+
+// =========================================================
 // FIREWORKS
 // =========================================================
 function launchFireworks() {
-  const colors = ['#FFD700','#FF5F52','#FFF176','#FF6F00','#4CAF50','#E91E63'];
-  for (let b = 0; b < 4; b++) {
+  const colors = ['#FFD700','#FF5F52','#FFF176','#FF6F00','#4CAF50','#E91E63','#FF1744','#F50057'];
+  for (let b = 0; b < 6; b++) {
     setTimeout(() => {
       const cx = Math.random() * window.innerWidth;
       const cy = Math.random() * window.innerHeight * 0.5;
-      for (let i = 0; i < 20; i++) {
+      const baseColor = colors[Math.floor(Math.random()*colors.length)];
+      const sparkCount = 28 + Math.floor(Math.random() * 12);
+      for (let i = 0; i < sparkCount; i++) {
         const s = document.createElement('div');
         s.className = 'spark';
         s.style.left = cx+'px'; s.style.top = cy+'px';
-        s.style.background = colors[Math.floor(Math.random()*colors.length)];
-        const a = (Math.PI*2/20)*i, d = 40+Math.random()*80;
-        s.style.transition = `all ${0.4+Math.random()*0.4}s ease-out`;
+        const color = Math.random() > 0.7 ? colors[Math.floor(Math.random()*colors.length)] : baseColor;
+        s.style.background = color;
+        s.style.boxShadow = `0 0 6px ${color}`;
+        s.style.width = (3 + Math.random() * 4) + 'px';
+        s.style.height = s.style.width;
+        const a = (Math.PI*2/sparkCount)*i + Math.random()*0.2, d = 50+Math.random()*120;
+        s.style.transition = `all ${0.5+Math.random()*0.6}s ease-out`;
         document.body.appendChild(s);
         requestAnimationFrame(() => { s.style.transform = `translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`; s.style.opacity = '0'; });
-        setTimeout(() => s.remove(), 1200);
+        setTimeout(() => s.remove(), 1500);
       }
-    }, b * 200);
+    }, b * 250);
   }
 }
 
