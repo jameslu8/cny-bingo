@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎲 老頑童骰子搖搖樂</title>
+<title>🎲 盧氏集團骰子搖搖樂</title>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -689,6 +689,35 @@ body {
 .result-outcome.win { color: var(--green); }
 .result-outcome.lose { color: #888; }
 
+/* Scoreboard */
+.scoreboard {
+  background: rgba(0,0,0,0.3);
+  border: 1.5px solid rgba(240,192,64,0.2);
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin: 15px 0;
+  backdrop-filter: blur(8px);
+}
+.scoreboard-title {
+  font-size: 0.72rem; color: var(--gold-dim); font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 8px; text-align: center;
+}
+.scoreboard-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.score-chip {
+  padding: 6px 14px;
+  background: var(--glass);
+  border: 1.5px solid rgba(240,192,64,0.25);
+  border-radius: 20px;
+  font-size: 0.82rem; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+}
+.score-name { color: var(--cream); }
+.score-amount { font-family: 'ZCOOL KuaiLe', cursive; }
+.score-amount.positive { color: var(--green); }
+.score-amount.negative { color: #FF5722; }
+.score-amount.zero { color: var(--gold-dim); }
+.result-balance { font-size: 0.75rem; color: var(--gold-dim); margin-top: 2px; }
+
 /* Toast */
 .toast {
   position: fixed;
@@ -742,7 +771,7 @@ body {
 <div class="screen active" id="loginScreen">
   <div class="login-card">
     <div class="login-header">🎲</div>
-    <div class="login-title">老頑童骰子搖搖樂</div>
+    <div class="login-title">盧氏集團骰子搖搖樂</div>
     <div class="login-sub">押點數，搖骰子，中一顆賺一倍！</div>
 
     <!-- Create/Join Toggle -->
@@ -758,7 +787,7 @@ body {
     <div id="joinPanel" style="display:none;">
       <div class="input-group">
         <label>🎯 房間碼</label>
-        <input type="text" id="roomCodeInput" placeholder="輸入 6 位數驗證碼" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+        <input type="text" id="roomCodeInput" placeholder="輸入 4 位數房間碼" maxlength="4" inputmode="numeric" pattern="[0-9]*">
       </div>
       <div class="input-group">
         <label>👤 你的名字</label>
@@ -859,6 +888,12 @@ body {
     </button>
   </div>
 
+  <!-- Scoreboard -->
+  <div class="scoreboard" id="scoreboard">
+    <div class="scoreboard-title">💰 累計戰績</div>
+    <div class="scoreboard-list" id="scoreboardList"></div>
+  </div>
+
   <!-- Result Panel -->
   <div class="result-panel" id="resultPanel" style="display:none;">
     <div class="result-title">本局結果</div>
@@ -890,7 +925,7 @@ body {
 <script>
 // Firebase config (same as bingo game)
 const firebaseConfig = {
-  apiKey: "AIzaSyBY7jEge0qqyJTox8gDcQcBgMCw2WyQgy8",
+  apiKey: "AIzaSyCbAlw-_oXbZ1XRujDfrvXGUfNBsVmzONk",
   authDomain: "cny-bingo.firebaseapp.com",
   databaseURL: "https://cny-bingo-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "cny-bingo",
@@ -905,6 +940,10 @@ let currentRoomCode = null;
 let isBanker = false;
 let myName = '';
 let gameState = 'waiting'; // waiting, betting, rolling, result
+let fromLobby = false;
+let lobbyParams = null;
+let playerBalances = {}; // { playerName: cumulative net amount }
+let lastResultProcessed = false; // prevent double-counting results
 
 // Initialize Firebase
 try {
@@ -918,7 +957,7 @@ try {
 
 // Generate room code
 function generateRoomCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 // Create room
@@ -964,8 +1003,8 @@ async function joinRoom() {
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   const playerName = document.getElementById('playerNameInput').value.trim();
 
-  if (!roomCode || roomCode.length !== 6) {
-    showToast('請輸入 6 位數驗證碼');
+  if (!roomCode || roomCode.length !== 4) {
+    showToast('請輸入 4 位數房間碼');
     return;
   }
 
@@ -1018,6 +1057,12 @@ function listenToRoom() {
 
     gameState = data.gameState || 'waiting';
 
+    // Sync balances from Firebase
+    if (data.balances) {
+      playerBalances = { ...data.balances };
+      renderScoreboard();
+    }
+
     // Update UI based on game state
     updateGameUI(data);
   });
@@ -1029,6 +1074,7 @@ function startGameView() {
   document.getElementById('roomCodeDisplay').textContent = currentRoomCode;
 
   initializeBettingTable();
+  renderScoreboard();
 
   if (isBanker) {
     document.getElementById('diceCupContainer').style.display = 'flex';
@@ -1408,6 +1454,7 @@ function updateGameUI(data) {
   // Handle betting state for all players
   if (data.gameState === 'betting') {
     // Reset betting state for new round
+    lastResultProcessed = false;
     selectedChip = null;
     myBets = {};
     document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('selected'));
@@ -1494,7 +1541,10 @@ function updateGameUI(data) {
 
   if (data.gameState === 'result' && data.diceResult) {
     showDiceResult(data.diceResult[0], data.diceResult[1]);
-    showResults(data);
+    if (!lastResultProcessed) {
+      lastResultProcessed = true;
+      showResults(data);
+    }
     highlightWinningSpots(data.diceResult);
 
     // Calculate player's result and show celebration
@@ -1572,17 +1622,55 @@ function showResults(data) {
       ? `贏 \$${netAmount}`
       : (netAmount < 0 ? `輸 \$${Math.abs(netAmount)}` : '打平');
 
-    results.push({ player: playerName, outcome, text });
+    // Update cumulative balance
+    if (!playerBalances[playerName]) playerBalances[playerName] = 0;
+    playerBalances[playerName] += netAmount;
+
+    const cumulative = playerBalances[playerName];
+    const balanceText = cumulative > 0 ? `累計 +$${cumulative}` : (cumulative < 0 ? `累計 $${cumulative}` : '累計 $0');
+
+    results.push({ player: playerName, outcome, text, balanceText });
   });
+
+  // Save balances to Firebase
+  if (isBanker && currentRoomRef) {
+    currentRoomRef.child('balances').set(playerBalances);
+  }
 
   resultList.innerHTML = results.map(r =>
     `<div class="result-item">
-      <span class="result-player">${r.player}</span>
+      <span class="result-player">
+        ${r.player}
+        <div class="result-balance">${r.balanceText}</div>
+      </span>
       <span class="result-outcome ${r.outcome}">${r.text}</span>
     </div>`
   ).join('');
 
   resultPanel.style.display = 'block';
+  renderScoreboard();
+}
+
+function renderScoreboard() {
+  const list = document.getElementById('scoreboardList');
+  const entries = Object.entries(playerBalances);
+
+  if (entries.length === 0) {
+    list.innerHTML = '<span style="color:var(--gold-dim); font-size:0.8rem; opacity:0.5;">尚無紀錄</span>';
+    return;
+  }
+
+  // Sort by balance descending
+  entries.sort((a, b) => b[1] - a[1]);
+
+  list.innerHTML = entries.map(([name, balance]) => {
+    const cls = balance > 0 ? 'positive' : (balance < 0 ? 'negative' : 'zero');
+    const prefix = balance > 0 ? '+' : '';
+    return `<div class="score-chip">
+      <span class="score-name">${name}</span>
+      <span class="score-amount ${cls}">${prefix}$${balance}</span>
+    </div>`;
+  }).join('');
 }
 
 function backToLogin() {
@@ -1595,6 +1683,17 @@ function backToLogin() {
     currentRoomRef.off();
   }
 
+  // If launched from lobby, navigate back to lobby
+  if (fromLobby && lobbyParams) {
+    const params = new URLSearchParams({
+      lobby: lobbyParams.lobby,
+      name: lobbyParams.name,
+      host: lobbyParams.host ? '1' : '0'
+    });
+    window.location.href = 'index.html?' + params.toString();
+    return;
+  }
+
   location.reload();
 }
 
@@ -1604,6 +1703,62 @@ function showToast(msg) {
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+// =========================================================
+// LOBBY INTEGRATION
+// =========================================================
+async function initFromLobby(code, name, host) {
+  currentRoomCode = code;
+  currentRoomRef = db.ref('diceRooms/' + code);
+  isBanker = host;
+  myName = name;
+
+  if (host) {
+    // Banker creates the dice room
+    await currentRoomRef.set({
+      banker: name,
+      players: {},
+      bets: {},
+      gameState: 'waiting',
+      timer: 120,
+      diceResult: null,
+      createdAt: Date.now()
+    });
+  } else {
+    // Non-host waits for room to exist, then joins
+    let attempts = 0;
+    while (attempts < 20) {
+      const snapshot = await currentRoomRef.once('value');
+      if (snapshot.exists()) break;
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+
+    // Add player
+    await currentRoomRef.child('players').child(name).set({
+      name, joinedAt: Date.now()
+    });
+  }
+
+  listenToRoom();
+  startGameView();
+}
+
+// Check for lobby URL params on load
+(function checkLobbyParams() {
+  const params = new URLSearchParams(window.location.search);
+  const lobby = params.get('lobby');
+  const name = params.get('name');
+  const host = params.get('host');
+
+  if (lobby && name && db) {
+    fromLobby = true;
+    lobbyParams = { lobby, name, host: host === '1' };
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    initFromLobby(lobby, name, host === '1');
+  }
+})();
 </script>
 
 </body>

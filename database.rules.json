@@ -6,6 +6,27 @@
         ".write": true,
         ".indexOn": ["createdAt"]
       }
+    },
+    "diceRooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["createdAt"]
+      }
+    },
+    "lobbies": {
+      "$lobbyId": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["createdAt"]
+      }
+    },
+    "hongbaoRooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["createdAt"]
+      }
     }
   }
 }
