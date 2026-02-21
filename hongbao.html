@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🧧 盧氏集團搶紅包</title>
 
 <!-- Firebase SDK -->
@@ -344,6 +344,14 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+.offline-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: #e74c3c; color: #fff; text-align: center;
+  padding: 8px; font-size: 0.85rem; font-weight: 700;
+  z-index: 9999; display: none;
+}
+.offline-banner.show { display: block; }
+
 @media (min-width: 600px) {
   #gameScreen { max-width: 550px; margin: 0 auto; }
 }
@@ -460,6 +468,7 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="offline-banner" id="offlineBanner">⚠️ 網路已斷線，請檢查連線</div>
 
 <script>
 // =========================================================
@@ -491,6 +500,16 @@ try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   console.log('🔥 Firebase initialized');
+
+  // Monitor connection status
+  db.ref('.info/connected').on('value', (snap) => {
+    const banner = document.getElementById('offlineBanner');
+    if (snap.val() === true) {
+      banner.classList.remove('show');
+    } else {
+      banner.classList.add('show');
+    }
+  });
 } catch (e) {
   console.error('Firebase error:', e);
 }
@@ -526,22 +545,35 @@ async function createRoom() {
   const name = document.getElementById('hostNameInput').value.trim();
   if (!name) { showToast('請輸入你的名字'); return; }
 
-  currentRoomCode = generateRoomCode();
-  currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
-  isHost = true;
-  myName = name;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '建立中...'; }
 
-  await currentRoomRef.set({
-    host: name,
-    players: { [name]: { name, joinedAt: Date.now() } },
-    currentEnvelope: null,
-    roundCount: 0,
-    createdAt: Date.now()
-  });
+  try {
+    currentRoomCode = generateRoomCode();
+    currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
+    isHost = true;
+    myName = name;
 
-  listenToRoom();
-  startGameView();
-  showToast('房間已建立！');
+    await currentRoomRef.set({
+      host: name,
+      players: { [name]: { name, joinedAt: Date.now() } },
+      currentEnvelope: null,
+      roundCount: 0,
+      createdAt: Date.now()
+    });
+
+    // Auto-remove room if host disconnects
+    currentRoomRef.onDisconnect().remove();
+
+    listenToRoom();
+    startGameView();
+    showToast('房間已建立！');
+  } catch (e) {
+    console.error('建立房間失敗:', e);
+    showToast('建立房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '建立房間'; }
+  }
 }
 
 async function joinRoom() {
@@ -551,22 +583,35 @@ async function joinRoom() {
   if (!code || code.length !== 4) { showToast('請輸入 4 位數房間碼'); return; }
   if (!name) { showToast('請輸入你的名字'); return; }
 
-  currentRoomCode = code;
-  currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
-  isHost = false;
-  myName = name;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '加入中...'; }
 
-  const snapshot = await currentRoomRef.once('value');
-  if (!snapshot.exists()) { showToast('房間不存在'); return; }
+  try {
+    currentRoomCode = code;
+    currentRoomRef = db.ref('hongbaoRooms/' + currentRoomCode);
+    isHost = false;
+    myName = name;
 
-  const data = snapshot.val();
-  if (data.players && data.players[name]) { showToast('名字已被使用'); return; }
+    const snapshot = await currentRoomRef.once('value');
+    if (!snapshot.exists()) { showToast('房間不存在'); return; }
 
-  await currentRoomRef.child('players').child(name).set({ name, joinedAt: Date.now() });
+    const data = snapshot.val();
+    if (data.players && data.players[name]) { showToast('名字已被使用'); return; }
 
-  listenToRoom();
-  startGameView();
-  showToast('已加入房間！');
+    await currentRoomRef.child('players').child(name).set({ name, joinedAt: Date.now() });
+
+    // Auto-remove player if disconnected
+    currentRoomRef.child('players').child(name).onDisconnect().remove();
+
+    listenToRoom();
+    startGameView();
+    showToast('已加入房間！');
+  } catch (e) {
+    console.error('加入房間失敗:', e);
+    showToast('加入房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '加入房間'; }
+  }
 }
 
 function startGameView() {
@@ -701,6 +746,9 @@ function listenToRoom() {
     } else if (env.state === 'done') {
       showEnvelopeResult(env, data.roundCount);
     }
+  }, (error) => {
+    console.error('房間連線錯誤:', error);
+    showToast('連線中斷，請重新整理頁面');
   });
 }
 

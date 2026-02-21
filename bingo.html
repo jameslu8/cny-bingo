@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🧧 盧氏集團馬上有錢 賓果大樂透</title>
 
 <!-- Firebase SDK -->
@@ -371,6 +371,14 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+.offline-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: #e74c3c; color: #fff; text-align: center;
+  padding: 8px; font-size: 0.85rem; font-weight: 700;
+  z-index: 9999; display: none;
+}
+.offline-banner.show { display: block; }
+
 /* Responsive */
 @media (max-width: 400px) {
   .grid { gap: 5px; }
@@ -526,6 +534,7 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="offline-banner" id="offlineBanner">⚠️ 網路已斷線，請檢查連線</div>
 
 <script>
 // =========================================================
@@ -560,6 +569,16 @@ try {
     db = firebase.database();
     firebaseEnabled = true;
     console.log('🔥 Firebase 已啟用');
+
+    // Monitor connection status
+    db.ref('.info/connected').on('value', (snap) => {
+      const banner = document.getElementById('offlineBanner');
+      if (snap.val() === true) {
+        banner.classList.remove('show');
+      } else {
+        banner.classList.add('show');
+      }
+    });
   } else {
     console.log('ℹ️ Firebase 未設定，使用本地模式');
   }
@@ -668,42 +687,55 @@ async function createRoom() {
     return;
   }
 
-  currentRoomCode = generateRoomCode();
-  currentRoomRef = db.ref('rooms/' + currentRoomCode);
-  isHost = true;
-  myPlayerName = hostName;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '建立中...'; }
 
-  // Create room data
-  await currentRoomRef.set({
-    host: hostName,
-    players: { [hostName]: { name: hostName, joinedAt: Date.now(), lines: 0 } },
-    calledItems: [],
-    turnOrder: [hostName],
-    currentTurn: hostName,
-    resetCounter: 0,
-    createdAt: Date.now(),
-    gameStarted: false
-  });
+  try {
+    currentRoomCode = generateRoomCode();
+    currentRoomRef = db.ref('rooms/' + currentRoomCode);
+    isHost = true;
+    myPlayerName = hostName;
 
-  // Setup player
-  players = [{
-    name: hostName,
-    card: makeCard(hostName),
-    lines: 0
-  }];
+    // Create room data
+    await currentRoomRef.set({
+      host: hostName,
+      players: { [hostName]: { name: hostName, joinedAt: Date.now(), lines: 0 } },
+      calledItems: [],
+      turnOrder: [hostName],
+      currentTurn: hostName,
+      resetCounter: 0,
+      createdAt: Date.now(),
+      gameStarted: false
+    });
 
-  currentTurn = hostName;
-  turnOrder = [hostName];
+    // Auto-remove room if host disconnects
+    currentRoomRef.onDisconnect().remove();
 
-  // Show room code
-  document.getElementById('displayRoomCode').textContent = currentRoomCode;
-  document.getElementById('createRoomPanel').style.display = 'none';
-  document.getElementById('roomCreatedPanel').style.display = 'block';
+    // Setup player
+    players = [{
+      name: hostName,
+      card: makeCard(hostName),
+      lines: 0
+    }];
 
-  // Listen for new players
-  listenToRoom();
+    currentTurn = hostName;
+    turnOrder = [hostName];
 
-  showToast('房間已建立！');
+    // Show room code
+    document.getElementById('displayRoomCode').textContent = currentRoomCode;
+    document.getElementById('createRoomPanel').style.display = 'none';
+    document.getElementById('roomCreatedPanel').style.display = 'block';
+
+    // Listen for new players
+    listenToRoom();
+
+    showToast('房間已建立！');
+  } catch (e) {
+    console.error('建立房間失敗:', e);
+    showToast('建立房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '建立房間'; }
+  }
 }
 
 async function joinRoom() {
@@ -720,51 +752,69 @@ async function joinRoom() {
     return;
   }
 
-  currentRoomCode = roomCode;
-  currentRoomRef = db.ref('rooms/' + currentRoomCode);
-  isHost = false;
-  myPlayerName = playerName;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '加入中...'; }
 
-  // Check if room exists
-  const snapshot = await currentRoomRef.once('value');
-  if (!snapshot.exists()) {
-    showToast('房間不存在');
-    return;
+  try {
+    currentRoomCode = roomCode;
+    currentRoomRef = db.ref('rooms/' + currentRoomCode);
+    isHost = false;
+    myPlayerName = playerName;
+
+    // Check if room exists
+    const snapshot = await currentRoomRef.once('value');
+    if (!snapshot.exists()) {
+      showToast('房間不存在');
+      return;
+    }
+
+    const roomData = snapshot.val();
+
+    // Check if name already taken
+    if (roomData.players && roomData.players[playerName]) {
+      showToast('名字已被使用');
+      return;
+    }
+
+    // Add player to room
+    await currentRoomRef.child('players').child(playerName).set({
+      name: playerName,
+      joinedAt: Date.now(),
+      lines: 0
+    });
+
+    // Auto-remove player if disconnected
+    currentRoomRef.child('players').child(playerName).onDisconnect().remove();
+
+    // Update turn order
+    const newTurnOrder = [...(roomData.turnOrder || []), playerName];
+    await currentRoomRef.child('turnOrder').set(newTurnOrder);
+
+    // Setup local player
+    players = [{
+      name: playerName,
+      card: makeCard(playerName),
+      lines: 0
+    }];
+
+    currentView = 0;
+
+    // Listen to room updates
+    listenToRoom();
+
+    // Start game
+    startOnlineGame();
+  } catch (e) {
+    console.error('加入房間失敗:', e);
+    showToast('加入房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '加入房間'; }
   }
+}
 
-  const roomData = snapshot.val();
-
-  // Check if name already taken
-  if (roomData.players && roomData.players[playerName]) {
-    showToast('名字已被使用');
-    return;
-  }
-
-  // Add player to room
-  await currentRoomRef.child('players').child(playerName).set({
-    name: playerName,
-    joinedAt: Date.now(),
-    lines: 0
-  });
-
-  // Update turn order
-  const newTurnOrder = [...(roomData.turnOrder || []), playerName];
-  await currentRoomRef.child('turnOrder').set(newTurnOrder);
-
-  // Setup local player
-  players = [{
-    name: playerName,
-    card: makeCard(playerName),
-    lines: 0
-  }];
-
-  currentView = 0;
-
-  // Listen to room updates
-  listenToRoom();
-
-  // Start game
-  startOnlineGame();
+function onFirebaseError(error) {
+  console.error('房間連線錯誤:', error);
+  showToast('連線中斷，請重新整理頁面');
 }
 
 function listenToRoom() {
@@ -786,7 +836,7 @@ function listenToRoom() {
         render();
       }
     }
-  });
+  }, onFirebaseError);
 
   // Listen for currentTurn
   currentRoomRef.child('currentTurn').on('value', (snapshot) => {
@@ -795,7 +845,7 @@ function listenToRoom() {
       startTurnTimer();
       render();
     }
-  });
+  }, onFirebaseError);
 
   // Listen for turnOrder
   currentRoomRef.child('turnOrder').on('value', (snapshot) => {
@@ -803,7 +853,7 @@ function listenToRoom() {
     if (document.getElementById('gameScreen').classList.contains('active')) {
       render();
     }
-  });
+  }, onFirebaseError);
 
   // Listen for players
   currentRoomRef.child('players').on('value', (snapshot) => {
@@ -838,7 +888,7 @@ function listenToRoom() {
     if (document.getElementById('gameScreen').classList.contains('active')) {
       render();
     }
-  });
+  }, onFirebaseError);
 
   // Listen for called items
   currentRoomRef.child('calledItems').on('value', async (snapshot) => {
@@ -875,7 +925,7 @@ function listenToRoom() {
         }
       }
     }
-  });
+  }, onFirebaseError);
 }
 
 function startOnlineGame() {
