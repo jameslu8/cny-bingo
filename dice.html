@@ -688,6 +688,7 @@ body {
 .result-outcome { font-weight: 700; }
 .result-outcome.win { color: var(--green); }
 .result-outcome.lose { color: #888; }
+.result-outcome.tie { color: var(--gold); }
 
 /* Scoreboard */
 .scoreboard {
@@ -740,6 +741,14 @@ body {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+.offline-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: #e74c3c; color: #fff; text-align: center;
+  padding: 8px; font-size: 0.85rem; font-weight: 700;
+  z-index: 9999; display: none;
+}
+.offline-banner.show { display: block; }
 
 @media (min-width: 600px) {
   #gameScreen {
@@ -902,6 +911,7 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="offline-banner" id="offlineBanner">⚠️ 網路已斷線，請檢查連線</div>
 
 <!-- Dice Animation Overlay (for all players) -->
 <div class="dice-animation-overlay" id="diceAnimationOverlay">
@@ -950,6 +960,16 @@ try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   console.log('🔥 Firebase initialized');
+
+  // Monitor connection status
+  db.ref('.info/connected').on('value', (snap) => {
+    const banner = document.getElementById('offlineBanner');
+    if (snap.val() === true) {
+      banner.classList.remove('show');
+    } else {
+      banner.classList.add('show');
+    }
+  });
 } catch (e) {
   console.error('Firebase error:', e);
   alert('Firebase 連線失敗，請確認網路連線');
@@ -968,24 +988,37 @@ async function createRoom() {
     return;
   }
 
-  currentRoomCode = generateRoomCode();
-  currentRoomRef = db.ref('diceRooms/' + currentRoomCode);
-  isBanker = true;
-  myName = bankerName;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '建立中...'; }
 
-  await currentRoomRef.set({
-    banker: bankerName,
-    players: {},
-    bets: {},
-    gameState: 'waiting',
-    timer: 120,
-    diceResult: null,
-    createdAt: Date.now()
-  });
+  try {
+    currentRoomCode = generateRoomCode();
+    currentRoomRef = db.ref('diceRooms/' + currentRoomCode);
+    isBanker = true;
+    myName = bankerName;
 
-  listenToRoom();
-  startGameView();
-  showToast('房間已建立！');
+    await currentRoomRef.set({
+      banker: bankerName,
+      players: {},
+      bets: {},
+      gameState: 'waiting',
+      timer: 120,
+      diceResult: null,
+      createdAt: Date.now()
+    });
+
+    // Auto-remove room if banker disconnects
+    currentRoomRef.onDisconnect().remove();
+
+    listenToRoom();
+    startGameView();
+    showToast('房間已建立！');
+  } catch (e) {
+    console.error('建立房間失敗:', e);
+    showToast('建立房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '開設賭桌'; }
+  }
 }
 
 function showJoinPanel() {
@@ -1013,40 +1046,53 @@ async function joinRoom() {
     return;
   }
 
-  currentRoomCode = roomCode;
-  currentRoomRef = db.ref('diceRooms/' + currentRoomCode);
-  isBanker = false;
-  myName = playerName;
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '加入中...'; }
 
-  const snapshot = await currentRoomRef.once('value');
-  if (!snapshot.exists()) {
-    showToast('房間不存在');
-    return;
+  try {
+    currentRoomCode = roomCode;
+    currentRoomRef = db.ref('diceRooms/' + currentRoomCode);
+    isBanker = false;
+    myName = playerName;
+
+    const snapshot = await currentRoomRef.once('value');
+    if (!snapshot.exists()) {
+      showToast('房間不存在');
+      return;
+    }
+
+    const roomData = snapshot.val();
+    if (roomData.players && roomData.players[playerName]) {
+      showToast('名字已被使用，請換一個');
+      return;
+    }
+
+    // Add player to room
+    await currentRoomRef.child('players').child(playerName).set({
+      name: playerName,
+      joinedAt: Date.now()
+    });
+
+    // Auto-remove player if disconnected
+    currentRoomRef.child('players').child(playerName).onDisconnect().remove();
+
+    // Show success message
+    if (roomData.gameState === 'betting') {
+      showToast('已加入房間，可以開始下注！');
+    } else if (roomData.gameState === 'waiting') {
+      showToast('已加入房間，等待遊戲開始');
+    } else {
+      showToast('已加入房間，觀戰中');
+    }
+
+    listenToRoom();
+    startGameView();
+  } catch (e) {
+    console.error('加入房間失敗:', e);
+    showToast('加入房間失敗，請重試');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '加入賭桌'; }
   }
-
-  const roomData = snapshot.val();
-  if (roomData.players && roomData.players[playerName]) {
-    showToast('名字已被使用，請換一個');
-    return;
-  }
-
-  // Add player to room
-  await currentRoomRef.child('players').child(playerName).set({
-    name: playerName,
-    joinedAt: Date.now()
-  });
-
-  // Show success message
-  if (roomData.gameState === 'betting') {
-    showToast('已加入房間，可以開始下注！');
-  } else if (roomData.gameState === 'waiting') {
-    showToast('已加入房間，等待遊戲開始');
-  } else {
-    showToast('已加入房間，觀戰中');
-  }
-
-  listenToRoom();
-  startGameView();
 }
 
 // Listen to room updates
@@ -1065,6 +1111,9 @@ function listenToRoom() {
 
     // Update UI based on game state
     updateGameUI(data);
+  }, (error) => {
+    console.error('房間連線錯誤:', error);
+    showToast('連線中斷，請重新整理頁面');
   });
 }
 
@@ -1617,7 +1666,7 @@ function showResults(data) {
     });
 
     const netAmount = totalWin - totalLose;
-    const outcome = netAmount > 0 ? 'win' : (netAmount < 0 ? 'lose' : 'lose');
+    const outcome = netAmount > 0 ? 'win' : (netAmount < 0 ? 'lose' : 'tie');
     const text = netAmount > 0
       ? `贏 \$${netAmount}`
       : (netAmount < 0 ? `輸 \$${Math.abs(netAmount)}` : '打平');
